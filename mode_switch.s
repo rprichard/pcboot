@@ -24,12 +24,12 @@ gdt:
         ; 32-bit data segment, Limit=0xfffff, Base=0, Type=Data+RW, S=1, DPL=0, P=1, L=0, B=1, G=1
         dd 0x0000ffff
         dd 0x00cf9200
-        ; 16-bit code segment, Limit=0xffff, Base=0, Type=Code+R, S=1, DPL=0, P=1, L=0, D=1, G=0
+        ; 16-bit code segment, Limit=0xffff, Base=0, Type=Code+R, S=1, DPL=0, P=1, L=0, D=0, G=0
         dd 0x0000ffff
-        dd 0x00409a00
-        ; 16-bit data segment, Limit=0xffff, Base=0, Type=Data+RW, S=1, DPL=0, P=1, L=0, B=1, G=0
+        dd 0x00009a00
+        ; 16-bit data segment, Limit=0xffff, Base=0, Type=Data+RW, S=1, DPL=0, P=1, L=0, B=0, G=0
         dd 0x0000ffff
-        dd 0x00409200
+        dd 0x00009200
 .end:
 
 
@@ -107,6 +107,7 @@ call_real_mode:
         ; Switch to real-mode.
         jmp 24:.step2
 .step2:
+        bits 16
         mov ax, 32
         mov ds, ax
         mov es, ax
@@ -118,7 +119,6 @@ call_real_mode:
         mov cr0, eax
         jmp 0:.step3
 .step3:
-        bits 16
         xor ax, ax
         mov ds, ax
         mov es, ax
