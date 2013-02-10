@@ -1,7 +1,7 @@
-#include "io.h"
-
 #include <stdbool.h>
 #include <stdint.h>
+
+#include "io.h"
 
 static void print_int(uint32_t i)
 {
