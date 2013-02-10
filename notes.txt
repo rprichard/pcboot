@@ -5,6 +5,8 @@ http://www.nasm.us/xdoc/2.10.07/html/nasmdoc0.html
 http://wiki.osdev.org/Memory_Map_%28x86%29
 http://sourceware.org/binutils/docs-2.23.1/ld/index.html
 http://brokenthorn.com/Resources/OSDevScanCodes.html
+https://ext4.wiki.kernel.org/index.php/Main_Page
+http://www.ousob.com/ng/asm/ng1f806.php
 
 If you have the kvm-ipxe package installed, remove it.  If it is installed,
 qemu will pause for several seconds on every single boot-up, apparently
