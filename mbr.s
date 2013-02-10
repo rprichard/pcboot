@@ -4,7 +4,7 @@ extern _mbrtext
 extern _stack_segment
 extern _stack_initial
 
-extern mode_switch_test
+extern init_protected_mode
 
 
         section .boot_disknum
@@ -14,9 +14,6 @@ boot_disknum:
 
         section .text
 
-; The symbol must be named main to make ld happy.
-global main
-main:
         ; Setup initial 16-bit environment.
         sti
         cld
@@ -50,11 +47,4 @@ main:
         mov bx, _mbrtext + 0x200
         int 0x13
 
-        ; Print a message!
-        mov ah, 0x0e
-        mov al, '!'
-        int 0x10
-
-        jmp mode_switch_test
-
-        hlt
+        jmp init_protected_mode
