@@ -156,12 +156,3 @@ call_real_mode:
 
         leave
         ret
-
-
-global m16_putc
-m16_putc:
-        ; Print a message.
-        mov ah, 0x0e
-        mov al, 'X'
-        int 0x10
-        ret
