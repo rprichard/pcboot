@@ -10,12 +10,13 @@ global print_char_16bit
 print_char_16bit:
         mov ah, 0x0e
         mov al, [print_char_ch]
+        mov bx, 7
         int 0x10
         ret
 
 global is_key_ready_16bit
 is_key_ready_16bit:
-        mov ah, 0x01
+        mov ax, 0x100
         int 0x16
         jz .empty
         mov byte [is_key_ready_out], 1
@@ -26,14 +27,14 @@ is_key_ready_16bit:
 
 global read_key_16bit
 read_key_16bit:
-        mov ah, 0x00
+        xor ax, ax
         int 0x16
         mov [read_key_out], ax
         ret
 
 global read_timer_16bit
 read_timer_16bit:
-        mov ah, 0x00
+        xor ax, ax
         int 0x1a
         mov [read_timer_out], dx
         mov [read_timer_out+2], cx
