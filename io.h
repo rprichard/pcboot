@@ -6,6 +6,7 @@
 
 void print_char(char ch);
 void print_string(const char *str);
+void print_uint32(uint32_t i);
 bool is_key_ready(void);
 uint16_t read_key(void);
 uint32_t read_timer(void);

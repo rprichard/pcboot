@@ -3,7 +3,7 @@
 set -e -x
 
 asm_files="mbr_boot mode_switch io16"
-c_files="_main main io"
+c_files="_main main io ext2_dump"
 objects=
 
 for file in $asm_files; do

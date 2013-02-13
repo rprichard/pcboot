@@ -40,6 +40,18 @@ void print_string(const char *str)
         print_char(*pch);
 }
 
+void print_uint32(uint32_t i)
+{
+    char buf[16];
+    char *pch = buf + sizeof(buf);
+    *(--pch) = '\0';
+    do {
+        *(--pch) = '0' + (i % 10);
+        i /= 10;
+    } while (i > 0);
+    print_string(pch);
+}
+
 bool is_key_ready(void)
 {
     call_real_mode(&is_key_ready_16bit);
