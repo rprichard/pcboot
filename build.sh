@@ -16,7 +16,7 @@ for file in $c_files; do
     objects="$objects $file.o"
 done
 
-ld -static -Tboot.ld -nostdlib --nmagic -o boot.elf -Map boot.map \
+gold -static -Tboot.ld -nostdlib --nmagic -o boot.elf -Map boot.map \
     $objects
 
 objcopy -R.bss -R.stack -Obinary boot.elf boot.bin
