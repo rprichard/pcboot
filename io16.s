@@ -5,6 +5,8 @@ extern print_char_ch
 extern is_key_ready_out
 extern read_key_out
 extern read_timer_out
+extern read_disk_drive
+extern read_disk_dap
 
 global print_char_16bit
 print_char_16bit:
@@ -43,4 +45,12 @@ read_timer_16bit:
 global pause_16bit
 pause_16bit:
         hlt
+        ret
+
+global read_disk_16bit
+read_disk_16bit:
+        mov ax, 0x4200
+        mov dx, [read_disk_drive]
+        mov si, read_disk_dap
+        int 0x13
         ret

@@ -9,7 +9,7 @@ SECTIONS
     . = 0x600;
     .mbrtext : {
         _mbrtext = .;
-        mbr.o(.text);
+        mbr_boot.o(.text);
         _mbrtext_end = .;
     }
 
@@ -31,11 +31,8 @@ SECTIONS
 
     .data : {
         _data = .;
-        *(.bss);
-        *(.bss*);
         *(.data);
         *(.rodata*);
-        *(COMMON)
         _data_end = .;
     }
 
@@ -44,12 +41,12 @@ SECTIONS
         . = ALIGN(0x200);
     }
 
-    /*
-     * Volatile non-initialized memory.
-     */
-
-    .boot_disknum : {
-        mbr.o(.boot_disknum);
+    .bss : {
+        _bss = .;
+        *(.bss);
+        *(.bss*);
+        *(COMMON)
+        _bss_end = .;
     }
 
     /* 4 KB stack. */

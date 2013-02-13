@@ -3,17 +3,12 @@
 extern _mbrtext
 extern _stack_segment
 extern _stack_initial
-
 extern init_protected_mode
 
 
-        section .boot_disknum
-global boot_disknum
-boot_disknum:
-        db 0x00
-
         section .text
 
+startup:
         ; Setup initial 16-bit environment.
         sti
         cld
@@ -32,8 +27,15 @@ boot_disknum:
         mov di, _mbrtext
         mov cx, 512
         rep movsb
-        jmp 0:.step1
-.step1:
+        jmp 0:step1
+step1:
+
+        ; Storage area for the disk number.  This is not in .bss because it is
+        ; initialized before .bss is zeroed.
+        jmp step2
+global boot_disknum
+boot_disknum:   db 0
+step2:
 
         ; Save the boot disk number.
         mov [boot_disknum], dl

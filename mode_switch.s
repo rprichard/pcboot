@@ -1,4 +1,4 @@
-extern main
+extern _main
 extern _stack
 extern _stack_segment
 extern _stack_end
@@ -72,7 +72,7 @@ init_protected_mode:
         mov gs, ax
         mov ss, ax
         mov esp, _stack_end
-        call main
+        call _main
         cli
         hlt
 .loop:

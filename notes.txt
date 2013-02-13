@@ -11,3 +11,10 @@ http://www.ousob.com/ng/asm/ng1f806.php
 If you have the kvm-ipxe package installed, remove it.  If it is installed,
 qemu will pause for several seconds on every single boot-up, apparently
 because it's trying to boot from the network.
+
+disk: 1000000 bytes, "fdisk -C7 -H4 -S63 disk"
+    sudo losetup --offset $(( 63 * 512 )) --sizelimit $(( 1890 * 512 )) -f disk
+    sudo mkfs.ext2 /dev/loop0
+    sudo mount /dev/loop0 /mnt
+    sudo umount /mnt
+    sudo losetup -d /dev/loop0
