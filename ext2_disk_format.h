@@ -199,7 +199,7 @@ struct ext2fs_gd {
 struct ext2fs_dinode {
     uint16_t    e2di_mode;      /*   0: IFMT, permissions; see below. */
     uint16_t    e2di_uid;       /*   2: Owner UID */
-    uint32_t    e2di_size;      /*   4: Size (in bytes) */
+    uint32_t    e2di_size;      /*   4: Low 32 bits of size (in bytes) */
     uint32_t    e2di_atime;     /*   8: Access time */
     uint32_t    e2di_ctime;     /*  12: Change time */
     uint32_t    e2di_mtime;     /*  16: Modification time */
@@ -212,7 +212,7 @@ struct ext2fs_dinode {
     uint32_t    e2di_blocks[EXT2_N_BLOCKS]; /* 40: disk blocks */
     uint32_t    e2di_gen;       /* 100: generation number */
     uint32_t    e2di_facl;      /* 104: file ACL (not implemented) */
-    uint32_t    e2di_dacl;      /* 108: dir ACL (not implemented) */
+    uint32_t    e2di_size_hi;   /* 108: High 32 bits of size (in bytes) */
     uint32_t    e2di_faddr;     /* 112: fragment address */
     uint8_t     e2di_nfrag;     /* 116: fragment number */
     uint8_t     e2di_fsize;     /* 117: fragment size */
