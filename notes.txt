@@ -18,3 +18,11 @@ disk: 1000000 bytes, "fdisk -C7 -H4 -S63 disk"
     sudo mount /dev/loop0 /mnt
     sudo umount /mnt
     sudo losetup -d /dev/loop0
+
+Small decompressors:
+ - http://code.google.com/p/lzfx/
+ - http://www.programmersheaven.com/download/2260/4/ZipView.aspx
+    - This one weighs in at 268 bytes of 32-bit code.
+ - http://liblzg.bitsnbites.eu/
+    - I hacked this one down to 619 bytes of 32-bit code.  I had to reverse
+      a manual loop unrolling.

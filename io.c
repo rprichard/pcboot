@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "mem.h"
 #include "mode_switch.h"
 
 void print_char_16bit(void);
@@ -27,6 +28,11 @@ struct {
     uint64_t sector;
     /* [1] http://en.wikipedia.org/wiki/INT_13H#INT_13h_AH.3D42h:_Extended_Read_Sectors_From_Drive */
 } read_disk_dap;
+
+static inline uint32_t io_min_uint32(uint32_t x, uint32_t y)
+{
+    return x < y ? x : y;
+}
 
 void print_char(char ch)
 {
@@ -99,7 +105,11 @@ void pause(void)
 /* Read sectors from the BIOS disk.  The address of the buffer must be
  * representable in segment:offset form.  (i.e. it must be within the first
  * 1 MiB of RAM.) */
-void read_disk(uint8_t drive, uint64_t sector, void *buffer, uint32_t count)
+void read_disk_sectors(
+    uint8_t drive,
+    void *buffer,
+    uint64_t sector,
+    uint32_t count)
 {
     char *pbuffer = buffer;
     read_disk_drive = drive;
@@ -111,5 +121,36 @@ void read_disk(uint8_t drive, uint64_t sector, void *buffer, uint32_t count)
         read_disk_dap.buffer_segment = (uint32_t)pbuffer >> 4;
         read_disk_dap.buffer_offset = (uint32_t)pbuffer & 0xf;
         call_real_mode(&read_disk_16bit);
+    }
+}
+
+/* This function is typically used to read pieces of file systems that may
+ * span a sector, but will not span many sectors.  Therefore, it may not need
+ * to be optimized. */
+void read_disk_bytes(
+    uint8_t drive,
+    void *buffer,
+    uint64_t offset,
+    uint32_t count)
+{
+    static char sector_buffer[512];
+
+    char *iter_buffer = (char*)buffer;
+    uint64_t iter_sector = offset >> SECTOR_SIZE_LOG2;
+    uint32_t iter_offset = offset & (SECTOR_SIZE - 1);
+    uint32_t iter_count = count;
+
+    while (iter_count > 0) {
+        read_disk_sectors(drive, sector_buffer, iter_sector, 1);
+        const uint32_t read_amount =
+                io_min_uint32(iter_count, SECTOR_SIZE - iter_offset);
+        memory_copy(
+            iter_buffer,
+            sector_buffer + iter_offset,
+            read_amount);
+        iter_buffer += read_amount;
+        iter_sector++;
+        iter_offset = 0;
+        iter_count -= read_amount;
     }
 }

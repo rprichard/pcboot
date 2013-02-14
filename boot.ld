@@ -26,6 +26,7 @@ SECTIONS
     .text : {
         _text = .;
         *(.text);
+        *(.text.startup);
         _text_end = .;
     }
 
@@ -65,5 +66,6 @@ SECTIONS
         *(.igot*);
         *(.rel*);
         *(.comment);
+        *(.eh_frame);
     }
 }
