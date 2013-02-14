@@ -235,7 +235,7 @@ bool ext2_linux16_boot(void *baton, void *buffer, uint32_t amount)
 
             memory_copy((char*)0x90400, buffer, 512);
             memory_copy((char*)0x10000, (char*)buffer + 512, 512);
-            boot->address = 0x10200;
+            boot->address = (char*)0x10200;
             return true;
         }
     }
@@ -249,6 +249,7 @@ bool ext2_linux16_boot(void *baton, void *buffer, uint32_t amount)
 }
 
 void linux16_boot_test_16bit(void);
+#include "mode_switch.h"
 
 void ext2_boot_test(struct ext2 *fs)
 {
