@@ -8,6 +8,7 @@ http://brokenthorn.com/Resources/OSDevScanCodes.html
 https://ext4.wiki.kernel.org/index.php/Main_Page
 http://www.ousob.com/ng/asm/ng1f806.php
 http://www.kernel.org/doc/Documentation/x86/boot.txt
+http://www.ctyme.com/rbrown.htm
 
 If you have the kvm-ipxe package installed, remove it.  If it is installed,
 qemu will pause for several seconds on every single boot-up, apparently
@@ -27,3 +28,7 @@ Small decompressors:
  - http://liblzg.bitsnbites.eu/
     - I hacked this one down to 619 bytes of 32-bit code.  I had to reverse
       a manual loop unrolling.
+
+To implement disk swapping of INT13, you need to reserve EBDA space.  Look at
+LILO's code for this -- it decrements a specific memory address in the 0x4xx
+area, then calls "int 0x12".
