@@ -22,6 +22,8 @@ SECTIONS
      * "Stage 1.5" code immediately after the MBR.
      */
 
+     _stage15 = .;
+
     . = 0x800;
     .text : {
         _text = .;
@@ -42,22 +44,29 @@ SECTIONS
         . = ALIGN(0x200);
     }
 
-    .bss : {
-        _bss = .;
-        *(.bss);
-        *(.bss*);
-        *(COMMON)
-        _bss_end = .;
-    }
+    _stage15_end = .;
+    _stage15_sectors = (_stage15_end - _stage15) / 512;
+
+    /*
+     * Uninitialized stack/bss memory.
+     */
 
     /* 4 KB stack. */
-    . = 0x7F000;
+    . = ALIGN(0x10);
     .stack : {
         _stack_segment = . >> 4;
         _stack_initial = 0x1000;
         _stack = .;
         . += 0x1000;
         _stack_end = .;
+    }
+
+    .bss : {
+        _bss = .;
+        *(.bss);
+        *(.bss*);
+        *(COMMON)
+        _bss_end = .;
     }
 
     /DISCARD/ : {

@@ -3,6 +3,7 @@
 extern _mbrtext
 extern _stack_segment
 extern _stack_initial
+extern _stage15_sectors
 extern init_protected_mode
 
 
@@ -40,9 +41,10 @@ step2:
         ; Save the boot disk number.
         mov [boot_disknum], dl
 
-        ; Load the rest of the boot loader (31 sectors, 16.5 KiB)
+        ; Load stage 1.5 just after the relocated MBR.
         ; (INT 13h AH=02h)
-        mov ax, 0x0200 | 0x1f
+        mov ah, 0x02
+        mov al, _stage15_sectors
         mov cx, 2
         xor dh, dh
         mov dl, [boot_disknum]
