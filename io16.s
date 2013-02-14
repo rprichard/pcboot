@@ -54,3 +54,19 @@ read_disk_16bit:
         mov si, read_disk_dap
         int 0x13
         ret
+
+
+
+        ; TODO: This is test code.  Consider removing it.
+global linux16_boot_test_16bit
+linux16_boot_test_16bit:
+        cli
+        mov ax, 0x9000
+        mov ss, ax
+        mov ds, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
+        mov ax, 0x800
+        mov sp, ax
+        jmp 0x9020:0

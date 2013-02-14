@@ -18,6 +18,6 @@ struct ext2 {
 };
 
 void ext2_open(struct ext2 *fs, uint8_t drive, uint64_t sector);
-void ext2_dump(struct ext2 *fs);
+void ext2_boot_test(struct ext2 *fs);
 
 #endif /* EXT2_H */

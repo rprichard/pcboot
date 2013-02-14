@@ -17,7 +17,7 @@ int main(void)
         if (mbr.entries[i].type == 0x83) {
             struct ext2 fs;
             ext2_open(&fs, boot_disknum, mbr.entries[i].lba_start);
-            ext2_dump(&fs);
+            ext2_boot_test(&fs);
         }
     }
 

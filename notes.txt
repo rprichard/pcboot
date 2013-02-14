@@ -7,6 +7,7 @@ http://sourceware.org/binutils/docs-2.23.1/ld/index.html
 http://brokenthorn.com/Resources/OSDevScanCodes.html
 https://ext4.wiki.kernel.org/index.php/Main_Page
 http://www.ousob.com/ng/asm/ng1f806.php
+http://www.kernel.org/doc/Documentation/x86/boot.txt
 
 If you have the kvm-ipxe package installed, remove it.  If it is installed,
 qemu will pause for several seconds on every single boot-up, apparently

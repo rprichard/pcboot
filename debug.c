@@ -13,6 +13,13 @@ static void debug_abort(void)
     while(1);
 }
 
+void dassert_failure(const char *file, int line, const char *condition)
+{
+    dprintf("%s, line %u: Assertion failed: \"%s\"\r\n",
+        file, line, condition);
+    debug_abort();
+}
+
 static void print_uint32_hex(uint32_t i)
 {
     char buf[16];
@@ -48,7 +55,9 @@ void vdprintf(const char *format, va_list ap)
             } else if (ch2 == 's') {
                 print_string(va_arg(ap, const char*));
             } else {
-                dprintf("error: invalid vdprintf format char '%c'\r\n", ch2);
+                print_string("error: invalid vdprintf format char '");
+                print_char(ch2);
+                print_string("'\r\n");
                 debug_abort();
             }
         } else {

@@ -1,9 +1,12 @@
 #include "ext2.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "debug.h"
 #include "ext2_disk_format.h"
 #include "io.h"
 #include "mem.h"
-
-#include "debug.h"
 
 static inline uint32_t ext2_how_many(uint32_t x, uint32_t y)
 {
@@ -130,12 +133,18 @@ void ext2_read_inode_data(
     bool (*callback)(void *baton, void *buffer, uint32_t amount),
     void *baton)
 {
+#ifdef BOOT_DEBUG
+    static bool in_call = false;
+    dassert(!in_call && "Reentrant call to ext2_read_inode_data not allowed.");
+    in_call = true;
+#endif
+
     /* TODO: Is the inode->e2di_size_hi field always valid? */
     uint64_t amount = inode->e2di_size | ((uint64_t)inode->e2di_size_hi << 32);
 
     ext2_read_inode_data_map(
         fs, &amount,
-        &inode->e2di_blocks,
+        inode->e2di_blocks,
         EXT2_NDIR_BLOCKS,
         0, callback, baton);
     for (int i = 0; i < 3; ++i) {
@@ -144,6 +153,11 @@ void ext2_read_inode_data(
             &inode->e2di_blocks[EXT2_IND_BLOCK + i],
             1, 1 + i, callback, baton);
     }
+
+#ifdef BOOT_DEBUG
+    dassert(in_call);
+    in_call = false;
+#endif
 }
 
 void ext2_open(struct ext2 *fs, uint8_t drive, uint64_t sector)
@@ -181,6 +195,11 @@ bool ext2_dump_direct(void *baton, void *buffer, uint32_t amount)
         dprintf("direct.ino = %u\r\n", direct->e2d_ino);
         dprintf("direct.namlen = %u\r\n", direct->e2d_namlen);
         dprintf("direct.name = [%s]\r\n", direct->e2d_name);
+        const uint32_t len = sizeof("memtest86+.bin") - 1;
+        if (direct->e2d_namlen == len &&
+                !memory_compare(direct->e2d_name, "memtest86+.bin", len)) {
+            *(uint32_t*)baton = direct->e2d_ino;
+        }
     }
     return true;
 }
@@ -197,7 +216,41 @@ bool ext2_dump_data(void *baton, void *buffer, uint32_t amount)
     return true;
 }
 
-void ext2_dump(struct ext2 *fs)
+struct linux16_boot {
+    char *address;
+};
+
+bool ext2_linux16_boot(void *baton, void *buffer, uint32_t amount)
+{
+    struct linux16_boot *boot = (struct linux16_boot*)baton;
+
+    if (boot->address >= (char*)0x90000) {
+        dassert(amount == 1024);
+        if (boot->address == (char*)0x90800) {
+            /* Special case: put the first sector at 0x90800, but put the
+             * next sector at 0x10000. */
+
+            //dprintf("Copied 0x%x from 0x%x to 0x%x\r\n", 512, buffer, (char*)0x90800);
+            //dprintf("Copied 0x%x from 0x%x to 0x%x\r\n", 512, (char*)buffer + 512, (char*)0x10000);
+
+            memory_copy((char*)0x90400, buffer, 512);
+            memory_copy((char*)0x10000, (char*)buffer + 512, 512);
+            boot->address = 0x10200;
+            return true;
+        }
+    }
+
+    //dprintf("Copied 0x%x from 0x%x to 0x%x\r\n", amount, buffer, boot->address);
+    //pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause();
+
+    memory_copy(boot->address, buffer, amount);
+    boot->address += amount;
+    return true;
+}
+
+void linux16_boot_test_16bit(void);
+
+void ext2_boot_test(struct ext2 *fs)
 {
     struct ext2fs_dinode inode;
     ext2_read_inode(fs, &inode, EXT2_ROOTINO);
@@ -207,13 +260,14 @@ void ext2_dump(struct ext2 *fs)
     dprintf("mtime: %u\r\n", inode.e2di_mtime);
     dprintf("size: %u, nblock: %u\r\n", inode.e2di_size, inode.e2di_nblock);
 
-    ext2_read_inode_data(fs, &inode, ext2_dump_direct, 0);
+    uint32_t boot_inode = 0;
+    ext2_read_inode_data(fs, &inode, ext2_dump_direct, &boot_inode);
 
-    uint32_t start = read_timer();
-    ext2_read_inode(fs, &inode, 12);
-    ext2_read_inode_data(fs, &inode, ext2_dump_data, 0);
-    dprintf("elapsed: %u ticks\r\n", read_timer() - start);
+    dassert(boot_inode != 0 && "Cannot find memtest86+.bin for booting.");
+    struct linux16_boot boot = { (char*)0x90000 };
+    ext2_read_inode(fs, &inode, boot_inode);
+    ext2_read_inode_data(fs, &inode, ext2_linux16_boot, &boot);
+    dprintf("memtest86+.bin loaded...\r\n");
 
-    dprintf("inode12: size=%u nblock=%u\r\n", inode.e2di_size, inode.e2di_nblock);
-
+    call_real_mode(&linux16_boot_test_16bit);
 }
