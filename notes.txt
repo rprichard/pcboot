@@ -14,9 +14,11 @@ If you have the kvm-ipxe package installed, remove it.  If it is installed,
 qemu will pause for several seconds on every single boot-up, apparently
 because it's trying to boot from the network.
 
-disk: 1000000 bytes, "fdisk -C7 -H4 -S63 disk"
-    sudo losetup --offset $(( 63 * 512 )) --sizelimit $(( 1890 * 512 )) -f disk
-    sudo mkfs.ext2 /dev/loop0
+disk: 128 MiB
+    dd if=/dev/zero of=disk bs=1MiB count=128
+    fdisk -C16 -H255 -S63 disk # Put the partition at sector 2048, size to 260096 sectors.
+    sudo losetup --offset $(( 2048 * 512 )) --sizelimit $(( 260096 * 512 )) -f disk
+    sudo mkfs.ext3 /dev/loop0
     sudo mount /dev/loop0 /mnt
     sudo umount /mnt
     sudo losetup -d /dev/loop0
