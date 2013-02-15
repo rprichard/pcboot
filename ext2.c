@@ -84,80 +84,98 @@ static void ext2_read_inode(
         ext2_min_uint32(sizeof(*inode), fs->inode_size));
 }
 
-static void ext2_read_inode_data_map(
-    struct ext2 *fs,
-    uint64_t *amount,
-    uint32_t *block_table,
-    int block_count,
-    int tree_depth,
-    bool (*callback)(void *baton, void *buffer, uint32_t amount),
-    void *baton)
+/* Return a pointer to a buffer containing the given block's data.  The buffer
+ * is valid until the next call to this routine. */
+void *ext2_block(struct ext2 *fs, uint32_t block_number)
 {
-    for (int i = 0; i < block_count; ++i) {
-        if (*amount == 0)
-            return;
-        static uint32_t sub_block[4][EXT2_MAX_BLOCK_SIZE / sizeof(uint32_t)];
-        ext2_read_sectors(
-            fs,
-            sub_block[tree_depth],
-            block_table[i] << fs->block_size_in_sectors_log2,
-            fs->block_size_in_sectors);
-        if (tree_depth == 0) {
-            const uint32_t chunk_amount =
-                    ext2_min_uint64(*amount, fs->block_size_in_bytes);
-            if (callback(baton, sub_block[tree_depth], chunk_amount))
-                *amount -= chunk_amount;
-            else
-                *amount = 0; /* abort reading */
-        } else {
-            ext2_read_inode_data_map(
-                fs, amount,
-                sub_block[tree_depth],
-                fs->block_size_in_bytes / sizeof(uint32_t),
-                tree_depth - 1,
-                callback, baton);
-        }
-    }
+    static char block_data[4096];
+    ext2_read_sectors(fs, block_data,
+        block_number << fs->block_size_in_sectors_log2,
+        fs->block_size_in_sectors);
+    return block_data;
 }
 
-/* Read all of the inode's data and pass it to the callback one block at a
- * time.  The callback's amount parameter may be less than a block on the last
- * call.  The callback returns true to continue reading and false to abort.
- *
- * This function is not reentrant.  Do not call it from its callback.
- *
- * TODO: For ext4, this function needs to read the extent tree instead. */
-void ext2_read_inode_data(
+/* Maps a block of an inode's content to its block number in the volume. */
+uint32_t ext2_inode_block(
     struct ext2 *fs,
-    struct ext2fs_dinode *inode,
-    bool (*callback)(void *baton, void *buffer, uint32_t amount),
-    void *baton)
+    uint32_t inode_number,
+    uint32_t block_number)
 {
-#ifdef BOOT_DEBUG
-    static bool in_call = false;
-    dassert(!in_call && "Reentrant call to ext2_read_inode_data not allowed.");
-    in_call = true;
-#endif
+    /* TODO: Some amount of caching might be needed here (or at a lower
+     * abstraction) to avoid seek latency. */
+    static struct ext2fs_dinode inode;
+    ext2_read_inode(fs, &inode, inode_number);
 
-    /* TODO: Is the inode->e2di_size_hi field always valid? */
-    uint64_t amount = inode->e2di_size | ((uint64_t)inode->e2di_size_hi << 32);
-
-    ext2_read_inode_data_map(
-        fs, &amount,
-        inode->e2di_blocks,
-        EXT2_NDIR_BLOCKS,
-        0, callback, baton);
-    for (int i = 0; i < 3; ++i) {
-        ext2_read_inode_data_map(
-            fs, &amount,
-            &inode->e2di_blocks[EXT2_IND_BLOCK + i],
-            1, 1 + i, callback, baton);
+    for (int i = 0; i < EXT2_NDIR_BLOCKS; ++i) {
+        if (block_number == 0)
+            return inode.e2di_blocks[i];
+        block_number--;
     }
 
-#ifdef BOOT_DEBUG
-    dassert(in_call);
-    in_call = false;
-#endif
+    int height;
+    const uint32_t block_children_count_log2 =
+        fs->block_size_in_bytes_log2 - 2;
+    const uint32_t block_children_count =
+        1 << block_children_count_log2;
+
+    /* Determine the height of the indirect tree containing the requested
+     * block. */
+    int tree_block_count = 1 << block_children_count_log2;
+    if (block_number < tree_block_count) {
+        height = 0;
+    } else {
+        block_number -= tree_block_count;
+        tree_block_count <<= block_children_count_log2;
+        if (block_number < tree_block_count) {
+            height = 1;
+        } else {
+            block_number -= tree_block_count;
+            height = 2;
+        }
+    }
+
+    uint32_t lookup_block = inode.e2di_blocks[EXT2_NDIR_BLOCKS + height];
+    for (int j = height; j >= 0; --j) {
+        /* TODO: Some amount of caching might be needed here (or at a lower
+         * abstraction) to avoid seek latency. */
+        const uint32_t table_index =
+            (block_number >> (block_children_count_log2 * height)) &
+                (block_children_count - 1);
+        const uint32_t *table = (uint32_t*)ext2_block(fs, lookup_block);
+        lookup_block = table[table_index];
+    }
+
+    return lookup_block;
+}
+
+/* This routine is based on read_disk_bytes.  The two could possibly be merged
+ * to reduce code size. */
+void ext2_read_inode_bytes(
+    struct ext2 *const fs,
+    void *const buffer,
+    const uint32_t inode_number,
+    const uint64_t offset,
+    const uint32_t count)
+{
+    char *iter_buffer = buffer;
+    uint32_t iter_block = offset >> fs->block_size_in_bytes_log2;
+    uint32_t iter_offset = offset & (fs->block_size_in_bytes - 1);
+    uint32_t iter_count = count;
+
+    while (iter_count > 0) {
+        char *block_data =
+            ext2_block(fs, ext2_inode_block(fs, inode_number, iter_block));
+        const uint32_t read_amount =
+            ext2_min_uint32(iter_count, fs->block_size_in_bytes - iter_offset);
+        memory_copy(
+            iter_buffer,
+            block_data + iter_offset,
+            read_amount);
+        iter_buffer += read_amount;
+        iter_block++;
+        iter_offset = 0;
+        iter_count -= read_amount;
+    }
 }
 
 void ext2_open(struct ext2 *fs, uint8_t drive, uint64_t sector)
@@ -184,69 +202,11 @@ void ext2_open(struct ext2 *fs, uint8_t drive, uint64_t sector)
 }
 
 
-bool ext2_dump_direct(void *baton, void *buffer, uint32_t amount)
-{
-    char *pbuffer_end = (char*)buffer + amount;
-    char *pbuffer = buffer;
-    while (pbuffer < pbuffer_end) {
-        const struct ext2fs_direct_2 *const direct =
-                (const struct ext2fs_direct_2*)pbuffer;
-        pbuffer += direct->e2d_reclen;
-        dprintf("direct.ino = %u\r\n", direct->e2d_ino);
-        dprintf("direct.namlen = %u\r\n", direct->e2d_namlen);
-        dprintf("direct.name = [%s]\r\n", direct->e2d_name);
-        const uint32_t len = sizeof("memtest86+.bin") - 1;
-        if (direct->e2d_namlen == len &&
-                !memory_compare(direct->e2d_name, "memtest86+.bin", len)) {
-            *(uint32_t*)baton = direct->e2d_ino;
-        }
-    }
-    return true;
-}
 
-bool ext2_dump_data(void *baton, void *buffer, uint32_t amount)
-{
-    /* dprintf("amount=%u\r\n", amount); */
-#if 0
-    for (int i = 0; i < amount; ++i) {
-        dprintf("%x ", ((unsigned char*)buffer)[i]);
-    }
-    dprintf("\r\n");
-#endif
-    return true;
-}
 
-struct linux16_boot {
-    char *address;
-};
 
-bool ext2_linux16_boot(void *baton, void *buffer, uint32_t amount)
-{
-    struct linux16_boot *boot = (struct linux16_boot*)baton;
 
-    if (boot->address >= (char*)0x90000) {
-        dassert(amount == 1024);
-        if (boot->address == (char*)0x90800) {
-            /* Special case: put the first sector at 0x90800, but put the
-             * next sector at 0x10000. */
 
-            //dprintf("Copied 0x%x from 0x%x to 0x%x\r\n", 512, buffer, (char*)0x90800);
-            //dprintf("Copied 0x%x from 0x%x to 0x%x\r\n", 512, (char*)buffer + 512, (char*)0x10000);
-
-            memory_copy((char*)0x90400, buffer, 512);
-            memory_copy((char*)0x10000, (char*)buffer + 512, 512);
-            boot->address = (char*)0x10200;
-            return true;
-        }
-    }
-
-    //dprintf("Copied 0x%x from 0x%x to 0x%x\r\n", amount, buffer, boot->address);
-    //pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause(); pause();
-
-    memory_copy(boot->address, buffer, amount);
-    boot->address += amount;
-    return true;
-}
 
 void linux16_boot_test_16bit(void);
 #include "mode_switch.h"
@@ -261,14 +221,37 @@ void ext2_boot_test(struct ext2 *fs)
     dprintf("mtime: %u\r\n", inode.e2di_mtime);
     dprintf("size: %u, nblock: %u\r\n", inode.e2di_size, inode.e2di_nblock);
 
-    uint32_t boot_inode = 0;
-    ext2_read_inode_data(fs, &inode, ext2_dump_direct, &boot_inode);
+    static unsigned char buffer[1024];
+    ext2_read_inode_bytes(fs, buffer, EXT2_ROOTINO, 0, 1024);
+    uint32_t memtest_inode = 0;
 
-    dassert(boot_inode != 0 && "Cannot find memtest86+.bin for booting.");
-    struct linux16_boot boot = { (char*)0x90000 };
-    ext2_read_inode(fs, &inode, boot_inode);
-    ext2_read_inode_data(fs, &inode, ext2_linux16_boot, &boot);
-    dprintf("memtest86+.bin loaded...\r\n");
+    {
+        char *pbuffer_end = (char*)buffer + 1024;
+        char *pbuffer = buffer;
+        while (pbuffer < pbuffer_end) {
+            const struct ext2fs_direct_2 *const direct =
+                    (const struct ext2fs_direct_2*)pbuffer;
+            pbuffer += direct->e2d_reclen;
+            dprintf("direct.ino = %u\r\n", direct->e2d_ino);
+            dprintf("direct.namlen = %u\r\n", direct->e2d_namlen);
+            dprintf("direct.name = [%s]\r\n", direct->e2d_name);
+            const uint32_t len = sizeof("memtest86+.bin") - 1;
+            if (direct->e2d_namlen == len &&
+                    !memory_compare(direct->e2d_name, "memtest86+.bin", len)) {
+                memtest_inode = direct->e2d_ino;
+            }
+        }
+        dassert(memtest_inode != 0);
+    }
 
-    call_real_mode(&linux16_boot_test_16bit);
+    {
+        struct ext2fs_dinode inode;
+        ext2_read_inode(fs, &inode, memtest_inode);
+        const uint32_t memtest_size = inode.e2di_size;
+
+        ext2_read_inode_bytes(fs, (char*)0x90000, memtest_inode, 0, 512 * 5);
+        ext2_read_inode_bytes(fs, (char*)0x10000, memtest_inode, 512 * 5, memtest_size - 512 * 5);
+        dprintf("memtest86+.bin loaded...\r\n");
+        call_real_mode(&linux16_boot_test_16bit);
+    }
 }
