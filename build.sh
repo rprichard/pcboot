@@ -2,7 +2,7 @@
 
 set -e -x
 
-asm_files="mbr_boot mode_switch io16"
+asm_files="mbr_boot enable_a20 mode_switch io16"
 c_files="_main main io ext2 mem debug"
 objects=
 

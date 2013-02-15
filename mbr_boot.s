@@ -4,6 +4,7 @@ extern _mbrtext
 extern _stack_segment
 extern _stack_initial
 extern _stage15_sectors
+extern enable_a20
 extern init_protected_mode
 
 
@@ -50,5 +51,7 @@ step2:
         mov dl, [boot_disknum]
         mov bx, _mbrtext + 0x200
         int 0x13
+
+        call enable_a20
 
         jmp init_protected_mode
