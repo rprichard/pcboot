@@ -12,6 +12,7 @@ for file in $asm_files; do
 done
 
 for file in $c_files; do
+    # TODO: consider adding -mregparm=3 for smaller code size.
     gcc -std=c99 -Os -m32 -fomit-frame-pointer -ffreestanding -c $file.c -o $file.o -DBOOT_DEBUG
     objects="$objects $file.o"
 done
