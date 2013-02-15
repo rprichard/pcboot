@@ -12,7 +12,7 @@ extern init_protected_mode
 
 startup:
         ; Setup initial 16-bit environment.
-        sti
+        cli
         cld
         mov ax, _stack_segment
         mov ss, ax
@@ -23,6 +23,7 @@ startup:
         mov es, ax
         mov fs, ax
         mov gs, ax
+        sti
 
         ; Relocate the MBR.
         mov si, 0x7c00
