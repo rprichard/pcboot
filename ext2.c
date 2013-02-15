@@ -249,8 +249,14 @@ void ext2_boot_test(struct ext2 *fs)
         ext2_read_inode(fs, &inode, memtest_inode);
         const uint32_t memtest_size = inode.e2di_size;
 
-        ext2_read_inode_bytes(fs, (char*)0x90000, memtest_inode, 0, 512 * 5);
-        ext2_read_inode_bytes(fs, (char*)0x10000, memtest_inode, 512 * 5, memtest_size - 512 * 5);
+        ext2_read_inode_bytes(fs, buffer, memtest_inode, 0, 512);
+        uint8_t setup_sectors = buffer[0x1f1];
+        if (setup_sectors == 0)
+            setup_sectors = 4;
+        const uint32_t setup_size = setup_sectors * 512;
+
+        ext2_read_inode_bytes(fs, (char*)0x90000, memtest_inode, 0, setup_size);
+        ext2_read_inode_bytes(fs, (char*)0x10000, memtest_inode, setup_size, memtest_size - setup_size);
         dprintf("memtest86+.bin loaded...\r\n");
         call_real_mode(&linux16_boot_test_16bit);
     }
