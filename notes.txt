@@ -1,3 +1,6 @@
+Implementation
+==============
+
 On Ubuntu, install bin86 to provide a 16-bit assembler and linker.
 Scratch that, use nasm.
 
@@ -9,6 +12,7 @@ https://ext4.wiki.kernel.org/index.php/Main_Page
 http://www.ousob.com/ng/asm/ng1f806.php
 http://www.kernel.org/doc/Documentation/x86/boot.txt
 http://www.ctyme.com/rbrown.htm
+http://aodfaq.wikispaces.com/a20
 
 If you have the kvm-ipxe package installed, remove it.  If it is installed,
 qemu will pause for several seconds on every single boot-up, apparently
@@ -34,3 +38,29 @@ Small decompressors:
 To implement disk swapping of INT13, you need to reserve EBDA space.  Look at
 LILO's code for this -- it decrements a specific memory address in the 0x4xx
 area, then calls "int 0x12".
+
+Design
+======
+
+Tentatively, I think the right approach for a BIOS-based bootloader is:
+
+ - Have a configuration-less stage1.  The goal of stage1 is to find the stage2
+   partition and load stage2.  The stage2 partition should be a FAT (VFAT?)
+   volume.  Typically, the stage1 partition should be on the booted disk, but
+   if it isn't, stage1 needs to scan disks looking for it.  Stage1 could look
+   at partition type codes, volume labels, and/or filesystem contents to find
+   stage2.  If something is amiss, then perhaps stage1 can have a GUI for
+   diagnosis and/or repair.
+
+ - Stage1 should enable the A20 line early and record the method used to enable
+   it.
+
+ - The interface between stage1 and stage2 should be simple:
+    - Load the entire stage2 "kernel" to 1MiB.
+    - Write configuration parameters somewhere.  They need to include:
+       - The BIOS disk number and 64-bit LBA offset of the stage2 volume.
+       - The method used to enable A20, or 0 if no method was needed.
+    - Specify the machine state precisely -- 32-bit protected mode, interrupts
+      disabled, direction flag clear, values of segment registers, value of
+      stack pointer.  See the multiboot specification.
+    - stage1 jumps to 0x100000.
