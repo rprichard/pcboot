@@ -39,28 +39,133 @@ To implement disk swapping of INT13, you need to reserve EBDA space.  Look at
 LILO's code for this -- it decrements a specific memory address in the 0x4xx
 area, then calls "int 0x12".
 
-Design
-======
+Design notes
+============
 
-Tentatively, I think the right approach for a BIOS-based bootloader is:
+Tools like FlexNet trample on the embedded region after the MBR.  Therefore,
+a good boot system for the PC should not assume it can store data there.
 
- - Have a configuration-less stage1.  The goal of stage1 is to find the stage2
-   partition and load stage2.  The stage2 partition should be a FAT (VFAT?)
-   volume.  Typically, the stage1 partition should be on the booted disk, but
-   if it isn't, stage1 needs to scan disks looking for it.  Stage1 could look
-   at partition type codes, volume labels, and/or filesystem contents to find
-   stage2.  If something is amiss, then perhaps stage1 can have a GUI for
-   diagnosis and/or repair.
+The MBR must be simple, and the rest of the bootloader must be in a proper
+partition.  It will be put in it a FAT32 partition, of some as-yet-undetermined
+partition type.  I lean towards 0x1c, Hidden FAT32 LBA.  The MBR must somehow
+detect which partition is the stage2 partition.
 
- - Stage1 should enable the A20 line early and record the method used to enable
-   it.
+TODO: I think there might be a problem with the design here.  The desire to use
+FAT32 is motivated by the goal of keeping the state more transparent.  (It's
+only "more" transparent because there's code hidden away in the MBR and in the
+FAT32 boot area.  Unlike GRUB, though, this hidden code is configuration-less.)
+The idea is that the user should understand:
+ - I have a special "pcboot" MBR.
+ - The only special thing about the "pcboot" MBR versus the normal DOS/Windows
+   MBR is that it always chooses the pcboot partition rather than the active
+   partition.  (It *might* also be the only MBR that can boot the pcboot VBR,
+   depending upon how the VBR finds the volume.)
+The problem is that there's no obvious way to mark the pcboot partition.  I had
+thought the label *might* be an option, but it's dangerous because the user
+might capriciously relabel it or label two volumes with the same pcboot label.
+I didn't anticipate that parted would relabel it.  I'm still optimistic that
+the issue can be solved.
 
- - The interface between stage1 and stage2 should be simple:
-    - Load the entire stage2 "kernel" to 1MiB.
-    - Write configuration parameters somewhere.  They need to include:
-       - The BIOS disk number and 64-bit LBA offset of the stage2 volume.
-       - The method used to enable A20, or 0 if no method was needed.
-    - Specify the machine state precisely -- 32-bit protected mode, interrupts
-      disabled, direction flag clear, values of segment registers, value of
-      stack pointer.  See the multiboot specification.
-    - stage1 jumps to 0x100000.
+The VBR code needs to find the volume.  There are a few obvious approaches:
+1. Use the FAT BPB_HiddSec field, which is conventionally the absolute LBA of
+   the FAT header.  The problem is that the field must be updated by partition
+   editing tools.  Partition creation is not a problem because a special pcboot
+   tool is already needed to install into the boot area.  I think tools
+   generally *do* update the field, but there are caveats:
+    - The Microsoft FAT specification says that the field is OS-dependent.
+    - I saw some online discussion that seemed to suggest that the field may or
+      may not include the MBR.  I am skeptical of that discussion's
+      correctness, though, because I think DOS/Windows rely on the field to
+      boot.
+    - I would like to allow a "logical" boot partition, something that the
+      conventional DOS/Windows MBR has never allowed, to my knowledge.  A
+      partition editing tool might not treat a logical partition as bootable.
+2. Use the same find logic in the MBR and VBR.  Problems:
+    - The MBR might let the user choose a partition to boot, particularly if it
+      can't find the right VBR.  It is poor UI if the VBR has to ask the user,
+      "Please select the same partition you just selected a second ago."
+      Moreover, this assumes that the pcboot VBR is only booted by the pcboot
+      MBR, and if that's the case, then we can...
+3. Use a special pcboot-only chain protocol:
+    - Pass the VBR LBA in a register, like ESI.
+    - Maybe change the boot address, too.
+    - Nifty variation: In the VBR, detect whether CS:IP is 0x7c00 or 0x8000.
+      If 0x8000, then we know to read ESI for the VBR LBA.  Otherwise, we
+      were chained conventionally.  (However: if we were chained normally,
+      we're back to the same boot protocol reliability problems.  We could
+      print an error if booted at 0x7c00.)
+4. In the pcboot VBR, assume the partition's active flag is set:
+   Problems:
+    - I would like to allow a logical boot partition, and because an active
+      logical partition is atypical, some partitioning tools might complain
+      about an active logical partition, or worse, clear the active flag.
+      Maybe not, though.
+   AFAIK, this approach allows chainloading with GRUB.  It's necessary to use
+   "makeactive" in GRUB Legacy and "parttool" with GRUB2.  GRUB limits the boot
+   flag to primary partitions.
+
+parted notes
+============
+ - parted's partition move/resize logic seems to be routed into a "FAT copy"
+   routine.
+ - parted appears to use the FAT offset field for both FAT16 and FAT32, so I
+   think it can read FAT16 partitions with reserved sectors.  However, when
+   creating/moving/resizing a partition, it resets the reserved sector count
+   to (FAT32 ? 32 : 1) + <extra-alignment-sectors>.  For FAT16, it copies none
+   of the reserved sectors, and for FAT32, it copies the minimum of the old and
+   new sectors.  (For consistency, it could have copied 32, but it doesn't.)
+ - The "FAT copy" routine *does* update the BPB_HiddSec field to the
+   conventional value (i.e. the absolute LBA sector of the FAT header).  It
+   looks like parted does not distinguish between primary and logical
+   partitions.
+ - However, the FAT copy routine also appears to reset the system ID to
+   "MSWIN4.1" and the volume label to "NO NAME    ".
+ - parted appears to identify a FAT partition by examining its content, without
+   paying any attention to the one-byte partition type code.
+
+(Tentative) Restrictions imposed by parted:
+ - The MBR search logic must not rely on the volume label because parted will
+   change it.  (The user could change it too, I suppose.)
+ - The volume must be FAT32, not FAT12/16.  This also forces a minimum size of
+   (IIRC) around 30MB.
+ - The volume boot code must be restricted to 15.5 KiB (i.e. 31 sectors).
+
+Windows partitioning/formatting notes
+=====================================
+ - None of the tools I tested allowed me to mark a logical partition active:
+    - MS-DOS 6 fdisk, Win7 diskpart, Win7 Disk Mgmt, MiniTool Partition Wizard
+ - Some tools appear to write 63 as the BPB_HiddSec value for logical FAT32
+   partitions (Win7 Disk Mgmt, MiniTool Partition Wizard).
+
+Proposed design
+===============
+
+ - There is a pcboot FAT32 partition, whose VBR embeds two fields in the "boot
+   code" region: the marker 0xbd22779119e3af57ab45b0f9a8c71e0d and a timestamp
+   field.  (Offsets and timestamp format are TBD, and the marker could be
+   adjusted.  The timestamp probably needs to be 8 bytes in size.)
+ - The MBR searches for a FAT32 partition with the pcboot marker and the
+   greatest timestamp field, with a tie going to the earliest partition by
+   index.
+ - The VBR is booted at 0x7c00 and makes no assumptions about register
+   contents (i.e. like a conventional DOS/Windows boot sector).  Unlike
+   DOS/Windows, it does not use the BPB_HiddSec field, because that field is
+   not usable with a logical partition.  Instead, the VBR searches for the
+   first partition whose first sector matches the code at 0x7c00.
+ - In both the MBR and VBR, it may be a good idea to validate that the
+   partition type corresponds to FAT to guard against untrusted data in an
+   arbitrary partition's first sector.
+ - The pcboot volume's type should be Hidden FAT32 LBA.
+
+Important design points:
+ - The pcboot volume can be a primary or logical partition.
+ - pcboot can be chainloaded from GRUB and probably from other bootloaders.
+ - Moving the pcboot volume in a partition editor is unlikely to prevent
+   booting.
+ - There is no pcboot-specific configuration state in the MBR.  There is only
+   a single configuration value in the VBR (the timestamp), and its value
+   matters only if a user manages to create two pcboot volumes on one disk.
+   An installer should try to prevent that from happening.
+ - Because the boot volume is FAT32, it can be modified using practically any
+   OS/utility.  FAT32 is well specified and simple, which makes it easy for
+   the pcboot boot-time code to modify its configuration.
