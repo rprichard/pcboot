@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Dependencies
+# Dependencies:
 #  - The fuseext2 package (/usr/bin/fuseext2)
 #  - /boot/memtest86+.bin
 #  - sfdisk
