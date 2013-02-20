@@ -1,4 +1,8 @@
 #!/bin/sh
+#
+# Dependencies:
+#  - nasm
+#  - binutils (gold-ld, objcopy)
 
 set -e -x
 
