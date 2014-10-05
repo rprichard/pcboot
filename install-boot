@@ -7,7 +7,7 @@ def install(target, source):
     with open(target, "r+b") as fp:
         fp.seek(0)
         original = fp.read(512)
-        boot = boot[0:446] + original[446:510] + boot[510:]
+        boot = boot[0:440] + original[440:510] + boot[510:]
         fp.seek(0)
         fp.write(boot)
 
