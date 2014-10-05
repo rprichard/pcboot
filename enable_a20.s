@@ -19,7 +19,7 @@ enable_a20:
         je .step1
         mov dword [a20_method], 0
         jmp .done
-.step1
+.step1:
         call enable_a20_bios
         call is_a20_enabled
         cmp ax, 0
@@ -35,7 +35,7 @@ enable_a20:
         mov byte [print_char_ch], '0'
         call print_char_16bit
         hlt
-.done
+.done:
         sti
         ret
 
