@@ -56,8 +56,6 @@ main:
         mov ss, ax
         mov ds, ax
         mov es, ax
-        mov fs, ax      ; Possibly unnecessary (OPTSIZE)
-        mov gs, ax      ; Possibly unnecessary (OPTSIZE)
         mov sp, _stack_end
         mov di, _bss
         mov cx, _bss_size
@@ -123,7 +121,7 @@ scan_mbr_partition:
         ; Inputs: si: address of the ptable entry pointing to the extended
         ; partition.
 scan_extended:
-        push esi
+        push si
         push ebx
         push ebp
         mov ebx, [si+8]         ; ebx: LBA of first EBR.
@@ -151,7 +149,7 @@ scan_extended:
         mov [extended_lba], eax
         pop ebp
         pop ebx
-        pop esi
+        pop si
         ret
 
 
@@ -220,8 +218,7 @@ read_sector:
         ; Inputs: si: the address of the string to print.
         ; I think this code can be made smaller. (OPTSIZE)
 print_string:
-        push si
-        push bx
+        pusha
 .loop:
         mov al, [si]
         test al, al
@@ -232,8 +229,7 @@ print_string:
         inc si
         jmp .loop
 .done:
-        pop bx
-        pop si
+        popa
         ret
 
 
