@@ -45,15 +45,13 @@ sector_buffer:                  equ _vbr
 ; warnings.
 
 _globals:
-disk_number_storage:            resb 1
-no_match_yet_storage:           resb 1
 match_lba_storage:              resd 1
 
 ; BP offsets for global variables  (BP is _globals - 2)
 
 _bp_address:                    equ _globals - 2
-disk_number:                    equ disk_number_storage - _bp_address
-no_match_yet:                   equ no_match_yet_storage - _bp_address
+disk_number:                    equ disk_number_storage - aa55_signature
+no_match_yet:                   equ no_match_yet_storage - aa55_signature
 match_lba:                      equ match_lba_storage - _bp_address
 
 
@@ -93,13 +91,11 @@ main:
         mov cl, 0xf0
         and cl, dl
         cmp cl, 0x80
-        je .dl_is_plausible
-        mov dl, 0x80
-.dl_is_plausible:
+        je .dl_is_implausible
         mov [bp + disk_number], dl
+.dl_is_implausible:
 
         ; Search the primary partition table for the pcboot VBR.
-        mov byte [bp + no_match_yet], 1
         mov si, mbr_ptable
 .primary_scan_loop:
         xor edx, edx
@@ -406,7 +402,12 @@ pcboot_vbr_marker:
 
 mbr_code_end:
 
-        times 440-($-main) db 0
+        times 438-($-main) db 0
+
+disk_number_storage:    db 0x80
+no_match_yet_storage:   db 0x01
+
+disk_signature:
         dd 0            ; 32-bit disk signature
         dw 0            ; padding
 
@@ -415,4 +416,6 @@ mbr_ptable:
         dd 0, 0, 0, 0
         dd 0, 0, 0, 0
         dd 0, 0, 0, 0
+
+aa55_signature:
         dw 0xaa55
