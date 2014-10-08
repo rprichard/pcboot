@@ -213,14 +213,131 @@ scan_extended_partition:
         ; Inputs: esi: the LBA of the sector to read.
         ; Trashes: none
 read_sector:
-        pusha
+        pushad
+
+        ; Clear the sector buffer.  If the machine lacks INT13 extensions, and
+        ; our sector isn't addressable using CHS, then instead of aborting, we
+        ; "succeed" and pretend the sector was empty.  We don't want to abort
+        ; on an unreachable partition when the pcboot VBR *is* CHS-addressable.
+        mov di, sector_buffer
+        xor al, al
+        mov cx, 512
+        cld
+        rep stosb
+
+        ; Check for INT13 extensions.  According to RBIL, INT13/41h modifies
+        ; AX, BX, CX, DH, and the CF flag.  According to a GRUB2 comment, it
+        ; also trashes DL on some BIOS versions, such as "AST BIOS 1.04".
+        mov ah, 0x41
+        mov bx, 0x55aa
+        mov dl, [bp + disk_number]
+        int 0x13
+        jc .chs_fallback
+        cmp bx, 0xaa55
+        jne .chs_fallback
+
+        ; Issue the read using INT13/42h.
         mov [int13_dap.sect], esi
         mov ah, 0x42
         mov dl, [bp + disk_number]
         mov si, int13_dap
         int 0x13
         jc fail
+        jmp .done
+
+.chs_fallback:
+        ; Get CHS geometry.  According to RBIL, INT13/08h modifies AX, BL, CX,
+        ; DX, DI, and the CF flag.
+        mov ah, 8
+        mov dl, [bp + disk_number]
+        xor di, di
+        int 0x13
+        jc fail
+        test ah, ah
+        jnz fail
+
+        ; INT13/08h returns the geometry in these variables:
+        ;  - CH == CYL_max & 0xFF
+        ;  - CL == (SECT_max & 0x3f) | ((CYL_max & 0x300) >> 2)
+        ;  - DH == HEAD_max
+        ; {CYL,SECT,HEAD}_max are maximum indices.
+        ;  - Sector indices start at one, so SECT_max is also the
+        ;    sectors/track.
+        ;  - Head indices start at zero, so tracks/cylinder is
+        ;    HEAD_max + 1.
+        ;  - Cylinder indices start at zero, so the count of cylinders is
+        ;    CYL_max + 1.
+
+        pusha
+        mov bp, sp
+
+        ; ---\/---\/---\/ DO NOT USE [bp + xxx] GLOBALS \/---\/---\/---
+
+        ; Stack frame after pusha:
+        ;       [bp+15]         ah
+        ;       [bp+14]         al, ax
+        ;       [bp+13]         ch
+        ;       [bp+12]         cl, cx
+        ;       [bp+11]         dh
+        ;       [bp+10]         dl, dx
+        ;       [bp+9]          bh
+        ;       [bp+8]          bl, bx
+        ;       [bp+6]          previous sp
+        ;       [bp+4]          bp
+        ;       [bp+2]          si
+        ;       [bp+0]          di
+
+        ; esi == LBA == (((Ci * Hc) + Hi) * Sc) + (Si - 1)
+
+        ; Divide LBA by Sc.
+        xor edx, edx
+        mov eax, esi
+        and ecx, 0x3f
+        div ecx
+
+        ; eax == (Ci * Hc) + Hi
+        ; edx == Si - 1
+
+        inc dx
+        push dx         ; Push Si.
+
+        ; Divide eax by Hc.
+        movzx ecx, byte [bp + 11]
+        inc cx
+        xor edx, edx
+        div ecx
+
+        ; dx == Hi
+        ; eax == Ci
+
+        ; Ci can exceed 0xffff, so we must use a 32-bit compare.  If the
+        ; sector is beyond the maximum cylinder, skip the write (and return a
+        ; buffer of all zeros.)
+        cmp eax, 1023
+        ja .out_of_bounds
+
+        ; ax == Ci
+
+        ; [*] intermediate value
+        pop cx                          ; [*] Set CL to Si.
+        mov ch, al                      ;     Set CH to (Ci & 0xff).
+        shl ah, 6                       ; [*] Set AH to (Ci & 0x300) >> 2.
+        or cl, ah                       ;     Set CL to Si | ((Ci & 0x300) >> 2).
+        mov dh, dl                      ;     Set DH to Hi.
+        mov dl, [disk_number_storage]
+        mov bx, sector_buffer
+        mov ax, 0x0102
+        int 0x13
+        jc fail
+
+.out_of_bounds:
+
+        ; ---/\---/\---/\ DO NOT USE [bp + xxx] GLOBALS /\---/\---/\---
+
         popa
+
+.done:
+        popad
         ret
 
 
