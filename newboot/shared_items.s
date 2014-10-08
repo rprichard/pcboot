@@ -226,9 +226,3 @@ print_string:
 .done:
         popa
         ret
-
-
-
-
-pcboot_error:
-        db "pcboot error",0

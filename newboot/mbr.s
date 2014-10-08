@@ -156,7 +156,7 @@ scan_pcboot_vbr_partition:
         ; We found a match!  Abort if this is the second match.
         dec byte [bp + no_match_yet]
         jnz fail
-        mov dword [bp + match_lba], esi
+        mov [bp + match_lba], esi
 
 .done:
         popa
@@ -173,6 +173,9 @@ scan_pcboot_vbr_partition:
 ;
 ; Initialized data
 ;
+
+pcboot_error:
+        db "pcbootM err",0
 
 pcboot_vbr_marker:
         db "PCBOOT"

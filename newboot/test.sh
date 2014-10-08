@@ -14,8 +14,9 @@ set -e -x
 dd if=/dev/zero of=bootvol bs=1MiB count=63
 mkfs.msdos -F32 -h2048 bootvol
 mcopy -ibootvol /boot/memtest86+.bin ::/MEMTEST.BIN
-dd if=dummy_fat_vbr.bin of=bootvol bs=1 conv=notrunc count=3
-dd if=dummy_fat_vbr.bin of=bootvol bs=1 conv=notrunc count=422 seek=90 skip=90
+dd if=vbr.bin of=bootvol bs=1 conv=notrunc count=3
+dd if=vbr.bin of=bootvol bs=1 conv=notrunc count=422 seek=90 skip=90
+dd if=stage1.bin of=bootvol bs=1 conv=notrunc seek=512
 
 # Create the disk image.
 dd if=/dev/zero of=disk bs=1MiB count=64
