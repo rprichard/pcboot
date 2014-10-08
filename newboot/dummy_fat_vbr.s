@@ -21,7 +21,7 @@ main:
         mov sp, 0x7c00                  ; Set SP to 0x7c00
         jmp 0:.init_cs
 
-.init_cs
+.init_cs:
         sti
         mov si, hello_msg
         call print_string
