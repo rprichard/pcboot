@@ -139,11 +139,18 @@ scan_pcboot_vbr_partition:
         mov esi, [si + 8]
         add esi, edx
         call read_sector
+
+        ; Test whether the sector we just read has the pcboot marker.  Set the
+        ; ZF flag but otherwise leave registers alone.  (In particular, leave
+        ; esi alone.)
+        pusha
         mov si, sector_buffer + 512 - 8
         mov di, pcboot_vbr_marker
         mov cx, 8
         cld
         repe cmpsb
+        popa
+
         jne .done
 
         ; We found a match!  Abort if this is the second match.
@@ -328,7 +335,7 @@ read_sector:
         mov dh, dl                      ;     Set DH to Hi.
         mov dl, [disk_number_storage]
         mov bx, sector_buffer
-        mov ax, 0x0102
+        mov ax, 0x0201
         int 0x13
         jc fail
 
