@@ -246,12 +246,19 @@ read_sector:
         jne .chs_fallback
 
         ; Issue the read using INT13/42h.
-        mov [int13_dap.sect], esi
+        xor eax, eax
+        push eax
+        push esi
+        push ax
+        push word sector_buffer
+        push word 1
+        push word 16
         mov ah, 0x42
         mov dl, [bp + disk_number]
-        mov si, int13_dap
+        mov si, sp
         int 0x13
         jc fail
+        add sp, 16
         jmp .done
 
 .chs_fallback:
@@ -397,18 +404,12 @@ pcboot_vbr_marker:
         db "PCBOOT"
         dw 0xaa55
 
-int13_dap:
-        db 16                   ; size of DAP structure
-        db 0                    ; reserved
-        dw 1                    ; sector count
-        dw sector_buffer        ; buffer offset
-        dw 0                    ; buffer segment
-.sect:  dq 0                    ; 64-bit sector LBA
-
 mbr_code_end:
+
         times 440-($-main) db 0
         dd 0            ; 32-bit disk signature
         dw 0            ; padding
+
 mbr_ptable:
         dd 0, 0, 0, 0
         dd 0, 0, 0, 0
