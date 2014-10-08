@@ -275,16 +275,14 @@ read_sector:
         jnz fail
 
         ; INT13/08h returns the geometry in these variables:
-        ;  - CH == CYL_max & 0xFF
-        ;  - CL == (SECT_max & 0x3f) | ((CYL_max & 0x300) >> 2)
-        ;  - DH == HEAD_max
-        ; {CYL,SECT,HEAD}_max are maximum indices.
-        ;  - Sector indices start at one, so SECT_max is also the
-        ;    sectors/track.
-        ;  - Head indices start at zero, so tracks/cylinder is
-        ;    HEAD_max + 1.
-        ;  - Cylinder indices start at zero, so the count of cylinders is
-        ;    CYL_max + 1.
+        ;  - CH == Cm & 0xFF
+        ;  - CL == (Sm & 0x3f) | ((Cm & 0x300) >> 2)
+        ;  - DH == Hm
+        ; [CSH]m are maximum indices.
+        ;  - Sector indices start at one, so Sm is also the Sc (sectors/track).
+        ;  - Head indices start at zero, so Hc (tracks/cylinder) is Hm + 1.
+        ;  - Cylinder indices start at zero, so Cc (count of cylinders) is
+        ;    Cm + 1.
 
         push dx
 
