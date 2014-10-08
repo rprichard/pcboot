@@ -310,6 +310,9 @@ read_sector:
         ; dx == Hi
         ; eax == Ci
 
+        ; [*] intermediate value
+        pop cx                          ; [*] Set CL to Si.
+
         ; Ci can exceed 0xffff, so we must use a 32-bit compare.  If the
         ; sector is beyond the maximum cylinder, skip the write (and return a
         ; buffer of all zeros.)
@@ -319,7 +322,6 @@ read_sector:
         ; ax == Ci
 
         ; [*] intermediate value
-        pop cx                          ; [*] Set CL to Si.
         mov ch, al                      ;     Set CH to (Ci & 0xff).
         shl ah, 6                       ; [*] Set AH to (Ci & 0x300) >> 2.
         or cl, ah                       ;     Set CL to Si | ((Ci & 0x300) >> 2).
