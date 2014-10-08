@@ -14,9 +14,8 @@ set -e -x
 dd if=/dev/zero of=bootvol bs=1MiB count=63
 mkfs.msdos -F32 -h2048 bootvol
 mcopy -ibootvol /boot/memtest86+.bin ::/MEMTEST.BIN
-python3 -c 'import time, struct, sys; sys.stdout.buffer.write(struct.pack("<Q", int(time.time() * 1000)))' > bootvol.timestamp
-dd if=bootvol.timestamp of=bootvol bs=1 count=8  seek=486 conv=notrunc
-dd if=bootvol.marker    of=bootvol bs=1 count=16 seek=494 conv=notrunc
+dd if=dummy_fat_vbr.elf of=bootvol bs=1 conv=notrunc count=3
+dd if=dummy_fat_vbr.elf of=bootvol bs=1 conv=notrunc count=422 seek=90 skip=90
 
 # Create the disk image.
 dd if=/dev/zero of=disk bs=1MiB count=64
@@ -41,7 +40,7 @@ unit: sectors
     disk6 : start=     1200, size=       90, Id= 0
     disk7 : start=     2048, size=   129024, Id=1c
 EOF
-sfdisk -q --no-reread --force -C64 -H64 -S32 disk < disk.setup.2
+sfdisk -q --no-reread --force -C64 -H64 -S32 disk < disk.setup.1
 echo SUCCESS
 
 # Install the MBR and volume into the disk.

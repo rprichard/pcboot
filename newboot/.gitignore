@@ -1,6 +1,6 @@
-mbr.bin
-mbr.elf
-mbr.map
+*.bin
+*.elf
+*.map
 *.o
 disk
 disk.setup
