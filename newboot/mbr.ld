@@ -12,10 +12,7 @@ SECTIONS
     }
 
     .bss : {
-        _bss = .;
         *(.bss);
-        _bss_end = .;
-        _bss_size = _bss_end - _bss;
     }
 
     . = 0x3c00;

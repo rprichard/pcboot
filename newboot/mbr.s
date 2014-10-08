@@ -1,30 +1,33 @@
 ; pcboot MBR.
 ;
 ; Searches the boot disk for the pcboot boot volume and launches it via the
-; conventional MBR-VBR interface.  Specifically, it searches the disk indicated
-; by the initial DL value for the partition with the pcboot marker and the
-; lowest pcboot timestamp value, breaking ties to the lower partition indices.
+; conventional MBR-VBR interface.
+;
+; The MBR only searches the disk indicated by the DL value.  Other disks could
+; conceivably be insecure (e.g. a USB flash drive).
+;
+; The VBR is identified by the string "PCBOOT" followed by 0xAA55 at the end of
+; the VBR.  The MBR searches all partitions, and succeeds if only a single VBR
+; is found.  If multiple VBRs match, the MBR aborts.
+;
+; To avoid a hypothetical(?) DOS vulnerability, the MBR only considers
+; partitions whose type ID is one of the expected values for a FAT32 volume.
+; (Suppose an attacker could control all of some partition's data.  It could
+; create a partition that looked like the boot volume.)  If this risk could be
+; ruled out somehow, it could reduce the amount of code here.
 ;
 ; TODO:
 ;  - Improved error checking, such as:
-;     - Look for a valid FAT32 partition type.
 ;     - Protecting against infinite loops in the logical partition scanning.
-;     - Verify that the second partition in an EBR has the right partition
-;       type.
 ;     - Call the BIOS routine to check for INT13 extensions
-;  - Reduce code size.  This is necessary before adding more error checks and a
-;    good idea in any case to allow for future expansion/tweaking.
+;     - If we don't have INT13 extensions, we should avoid scanning partitions
+;       past the CHS limit, maybe?
 ;  - Improve the MBR-VBR interface.  Review the Wikipedia MBR page for details.
 ;     - Consider passing through DH and DS:DI for some kind of "PnP" data.
-;     - Zero other registers to avoid leaking implementation details.  This
-;       wastes code size, though.
-;     - Review whether the MBR should use drive 0x80 or DL.
-
+;
 
         bits 16
 
-        extern _bss
-        extern _bss_size
         extern _stack_end
         extern _mbr
         extern _mbr_unrelocated
@@ -33,12 +36,23 @@
 ; Reuse the VBR chain address, 0x7c00, as the buffer
 sector_buffer:                  equ _vbr
 
-; Address constants
-vbr_timestamp_offset:           equ 0x1e6       ; 8 bytes
-vbr_marker_offset:              equ 0x1ee       ; 16 bytes
-vbr_marker_size:                equ 16
+        section .bss
 
+; Reserve space for global variables.  These variables are not actually
+; zero-initialized, but putting them in a section named ".bss" silences nasm
+; warnings.
 
+_globals:
+disk_number_storage:            resb 1
+no_match_yet_storage:           resb 1
+match_lba_storage:              resd 1
+
+; BP offsets for global variables  (BP is _globals - 2)
+
+_bp_address:                    equ _globals - 2
+disk_number:                    equ disk_number_storage - _bp_address
+no_match_yet:                   equ no_match_yet_storage - _bp_address
+match_lba:                      equ match_lba_storage - _bp_address
 
 
 ;
@@ -53,160 +67,169 @@ main:
         ; trash DL, which still contains the BIOS boot disk number.
         cli
         xor ax, ax
-        mov ss, ax
-        mov ds, ax
-        mov es, ax
-        mov sp, _stack_end
-        mov di, _bss
-        mov cx, _bss_size
-        rep stosb
-        mov si, _mbr_unrelocated
+        mov ss, ax                      ; Clear SS
+        mov ds, ax                      ; Clear DS
+        mov es, ax                      ; Clear ES
+        mov sp, _mbr_unrelocated        ; Set SP to 0x7c00
+        mov si, sp
         mov di, _mbr
         mov cx, 512
-        rep movsb
-        jmp 0:.relocated
+        cld
+        rep movsb                       ; Copy MBR from 0x7c00 to 0x600.
+        jmp 0:.relocated                ; Set CS:IP to 0:0x600.
+
 .relocated:
         sti
-        ; Save the disk number.
-        mov [disk_number], dl
-        ; Scan for the VBR.
-        call scan_partitions
-        mov eax, [vol_candidate_lba]
-        test eax, eax
-        jz .error_no_pcboot_volume
-        ; Launch stage2.
-        mov si, msg_transfer
-        call print_string
-        mov eax, [vol_candidate_lba]
-        call read_sector
-        mov dl, [disk_number]
-        jmp 0:_vbr
-.error_no_pcboot_volume:
-        mov si, error_no_volume
-        call print_string
-        cli
-        hlt
 
+        ; Use BP to access global variables with smaller memory operands.  We
+        ; also use BP as the end address for the primary partition table scan.
+        mov bp, _bp_address
 
+        ; GRUB and GRUB2 use DL, but with some kind of adjustment.  Follow the
+        ; GRUB2 convention and use DL if it's in the range 0x80-0x8f.
+        ; Otherwise, fall back to 0x80.
+        mov cl, 0xf0
+        and cl, dl
+        cmp cl, 0x80
+        je .dl_is_plausible
+        mov dl, 0x80
+.dl_is_plausible:
+        mov [bp + disk_number], dl
 
-
-        ; Scan all the primary and logical partitions on the disk looking for
-        ; the best pcboot volume candidate.
-scan_partitions:
+        ; Search the primary partition table for the pcboot VBR.
+        mov byte [bp + no_match_yet], 1
         mov si, mbr_ptable
-        lea di, [mbr_ptable+0x40]
-.loop:
-        call scan_mbr_partition
+.primary_scan_loop:
+        xor edx, edx
+        call scan_pcboot_vbr_partition
+        call scan_extended_partition
         add si, 0x10
-        cmp si, di
-        jne .loop
-        ret
+        cmp si, bp
+        jnz .primary_scan_loop
 
+        ; If we didn't find a match, fail at this point.
+        cmp byte [bp + no_match_yet], 0
+        jne fail
 
-
-
-        ; Partition scanning: scan the MBR partition.
-        ; Inputs: si: address of ptable entry.
-scan_mbr_partition:
-        cmp byte [si+4], 0x5
-        je scan_extended
-        cmp byte [si+4], 0xf
-        je scan_extended
-        jmp scan_partition
-
-
-
-
-        ; Scan an extended partition.
-        ; Inputs: si: address of the ptable entry pointing to the extended
-        ; partition.
-scan_extended:
-        push si
-        push ebx
-        push ebp
-        mov ebx, [si+8]         ; ebx: LBA of first EBR.
-        test ebx, ebx
-        jz .done
-        mov ebp, ebx            ; ebp: LBA of current EBR in loop.
-.loop:
-        ; Look in entry 1 for a normal partition.
-        mov eax, ebp
+        ; Load the matching sector to 0x7c00 and jump.
+        mov esi, [bp + match_lba]
         call read_sector
-        lea si, [sector_buffer + 446]
-        mov [extended_lba], ebp
-        call scan_partition
-        ; Look in entry 2 for a linked EBR partition.
-        ; Reload the parent EBR because the static buffer has been trashed.
-        mov eax, ebp
+        xor si, si
+        mov dl, [bp + disk_number]
+        jmp _vbr
+
+
+
+
+        ; Examine a single partition to see whether it is a matching pcboot
+        ; VBR.  If it is one, update the global state (and potentially halt).
+        ; Inputs: si points to a partition entry
+        ;         edx is a value to add to the entry's LBA
+        ; Trashes: esi(high), sector_buffer
+scan_pcboot_vbr_partition:
+        pusha
+        ; Check the partition type.  Allowed types: 0x0b, 0x0c, 0x1b, 0x1c.
+        mov al, [si + 4]
+        and al, 0xef
+        sub al, 0x0b
+        cmp al, 1
+        ja .done
+
+        ; Look for the appropriate 8-byte signature at the end of the VBR.
+        mov esi, [si + 8]
+        add esi, edx
         call read_sector
-        mov ebp, [sector_buffer + 446 + 0x10 + 8]
-        test ebp, ebp
-        jz .done
-        add ebp, ebx
-        jmp .loop
-.done:
-        xor eax, eax
-        mov [extended_lba], eax
-        pop ebp
-        pop ebx
-        pop si
-        ret
-
-
-
-
-        ; Scan a single partition entry and update the best candidate global
-        ; variables.  The entry might not contain a partition.
-        ;
-        ; Inputs: si: address of ptable entry.
-scan_partition:
-        push si
-        push di
-        push ebx
-        mov ebx, [si+8]
-        test ebx, ebx
-        jz .done
-        add ebx, [extended_lba]
-        mov eax, ebx
-        call read_sector
-        mov si, pcboot_marker
-        lea di, [sector_buffer + vbr_marker_offset]
-        mov cx, vbr_marker_size
+        mov si, sector_buffer + 512 - 8
+        mov di, pcboot_vbr_marker
+        mov cx, 8
+        cld
         repe cmpsb
         jne .done
-        mov eax, [sector_buffer + vbr_timestamp_offset]
-        mov edx, [sector_buffer + vbr_timestamp_offset + 4]
-        cmp edx, [vol_candidate_timestamp + 4]
-        ja .new_candidate
-        jb .done
-        cmp eax, [vol_candidate_timestamp]
-        jbe .done
-.new_candidate:
-        mov [vol_candidate_lba], ebx
-        mov [vol_candidate_timestamp], eax
-        mov [vol_candidate_timestamp+4], edx
+
+        ; We found a match!  Abort if this is the second match.
+        dec byte [bp + no_match_yet]
+        jnz fail
+        mov dword [bp + match_lba], esi
+
 .done:
-        pop ebx
-        pop di
-        pop si
+        popa
         ret
 
 
 
 
-        ; Inputs: eax: the LBA of the sector to read.
+        ; Scan a possible extended partition looking for logical pcboot VBRs.
+        ; Inputs: si points to a partition entry that might be an EBR
+        ; Trashes: esi(high), ecx(high), edx(high), sector_buffer
+scan_extended_partition:
+        pusha
+        mov ecx, [si + 8] ; ecx == start of entire extended partition
+        mov edx, ecx      ; edx == start of current EBR
+
+.loop:
+        ; At this point:
+        ;  - si points at an entry that might be an EBR.  It's either any entry
+        ;    in the MBR or the second entry of an EBR.
+        ;  - edx is the LBA of the referenced partition.
+
+        ; Check the partition type.  Allowed types: 0x05, 0x0f, 0x85.
+        mov al, [si + 4]
+        cmp al, 0x0f
+        je .match
+        and al, 0x7f
+        cmp al, 0x05
+        jne .done
+
+.match:
+        ; si points at an entry for a presumed EBR, whose LBA is in edx.  Read
+        ; the EBR from disk.
+        mov esi, edx
+        call read_sector
+
+        ; Verify that the EBR has the appropriate signature.
+        cmp word [sector_buffer + 512 - 2], 0xaa55
+        jne .done
+
+        ; Check the first partition for a pcboot VBR.
+        mov si, sector_buffer + 512 - 2 - 64
+        call scan_pcboot_vbr_partition
+
+        ; Advance to the next EBR.  We must reread the EBR because it was
+        ; trashed while scanning for a VBR.
+        mov esi, edx
+        call read_sector
+        mov si, sector_buffer + 512 - 2 - 64 + 16
+        mov edx, ecx
+        add edx, [si + 8]
+        jmp .loop
+
+.done:
+        popa
+        ret
+
+
+
+
+        ; Inputs: esi: the LBA of the sector to read.
+        ; Trashes: none
 read_sector:
-        push si
-        mov [int13_dap.sect], eax
+        pusha
+        mov [int13_dap.sect], esi
         mov ah, 0x42
-        mov dl, [disk_number]
+        mov dl, [bp + disk_number]
         mov si, int13_dap
         int 0x13
-        jc .error
-        pop si
+        jc fail
+        popa
         ret
-.error:
-        mov si, error_read
+
+
+
+
+        ; Print a NUL-terminated string and hang.
+        ; Inputs: si: the address of the string to print.
+fail:
+        mov si, pcboot_error
         call print_string
         cli
         hlt
@@ -216,7 +239,7 @@ read_sector:
 
         ; Print a NUL-terminated string.
         ; Inputs: si: the address of the string to print.
-        ; I think this code can be made smaller. (OPTSIZE)
+        ; Trashes: none
 print_string:
         pusha
 .loop:
@@ -239,19 +262,13 @@ print_string:
 ; Initialized data
 ;
 
-error_no_volume:
-        db "pcboot-MBR: cannot find VBR",0
-error_read:
-        db "pcboot-MBR: read error",0
-msg_transfer:
-        db "pcboot-MBR: chaining...",13,10,0
+pcboot_error:
+        db "pcboot error",0
 
-        align 16
-pcboot_marker:
-        db 0xbd,0x22,0x77,0x91,0x19,0xe3,0xaf,0x57
-        db 0xab,0x45,0xb0,0xf9,0xa8,0xc7,0x1e,0x0d
+pcboot_vbr_marker:
+        db "PCBOOT"
+        dw 0xaa55
 
-        align 16
 int13_dap:
         db 16                   ; size of DAP structure
         db 0                    ; reserved
@@ -269,17 +286,3 @@ mbr_ptable:
         dd 0, 0, 0, 0
         dd 0, 0, 0, 0
         dw 0xaa55
-
-
-
-
-;
-; Zeroed data
-;
-
-        section .bss
-
-vol_candidate_lba:              resd 1
-vol_candidate_timestamp:        resq 1
-extended_lba:                   resd 1
-disk_number:                    resb 1
