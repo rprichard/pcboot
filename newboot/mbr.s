@@ -24,6 +24,8 @@
 ;       past the CHS limit, maybe?
 ;  - Improve the MBR-VBR interface.  Review the Wikipedia MBR page for details.
 ;     - Consider passing through DH and DS:DI for some kind of "PnP" data.
+;     - Consider whether interrupts should be on or off.
+;     - Does the Direction Flag need to be cleared?
 ;
 
         bits 16
