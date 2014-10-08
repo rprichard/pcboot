@@ -286,24 +286,7 @@ read_sector:
         ;  - Cylinder indices start at zero, so the count of cylinders is
         ;    CYL_max + 1.
 
-        pusha
-        mov bp, sp
-
-        ; ---\/---\/---\/ DO NOT USE [bp + xxx] GLOBALS \/---\/---\/---
-
-        ; Stack frame after pusha:
-        ;       [bp+15]         ah
-        ;       [bp+14]         al, ax
-        ;       [bp+13]         ch
-        ;       [bp+12]         cl, cx
-        ;       [bp+11]         dh
-        ;       [bp+10]         dl, dx
-        ;       [bp+9]          bh
-        ;       [bp+8]          bl, bx
-        ;       [bp+6]          previous sp
-        ;       [bp+4]          bp
-        ;       [bp+2]          si
-        ;       [bp+0]          di
+        push dx
 
         ; esi == LBA == (((Ci * Hc) + Hi) * Sc) + (Si - 1)
 
@@ -316,12 +299,14 @@ read_sector:
         ; eax == (Ci * Hc) + Hi
         ; edx == Si - 1
 
+        pop cx          ; post-invariant: cx == int13 dx
+        movzx ecx, ch   ; post-invariant: ecx == Hm
+        inc cx          ; post-invariant: ecx == Hc
+
         inc dx
         push dx         ; Push Si.
 
         ; Divide eax by Hc.
-        movzx ecx, byte [bp + 11]
-        inc cx
         xor edx, edx
         div ecx
 
@@ -335,7 +320,7 @@ read_sector:
         ; sector is beyond the maximum cylinder, skip the write (and return a
         ; buffer of all zeros.)
         cmp eax, 1023
-        ja .out_of_bounds
+        ja .done
 
         ; ax == Ci
 
@@ -344,17 +329,11 @@ read_sector:
         shl ah, 6                       ; [*] Set AH to (Ci & 0x300) >> 2.
         or cl, ah                       ;     Set CL to Si | ((Ci & 0x300) >> 2).
         mov dh, dl                      ;     Set DH to Hi.
-        mov dl, [disk_number_storage]
+        mov dl, [bp + disk_number]
         mov bx, sector_buffer
         mov ax, 0x0201
         int 0x13
         jc fail
-
-.out_of_bounds:
-
-        ; ---/\---/\---/\ DO NOT USE [bp + xxx] GLOBALS /\---/\---/\---
-
-        popa
 
 .done:
         popad
