@@ -59,18 +59,17 @@ extra_storage_offset:           equ 2
 match_lba:                      equ extra_storage_offset + 0    ; dword
 
 
+%include "shared_macros.s"
 
-
-;
-; Executable code and initialized data
-;
 
         section .boot_record
 
         global main
 main:
+        ;
         ; Setup the environment and relocate the code.  Be careful not to
         ; trash DL, which still contains the BIOS boot disk number.
+        ;
         cli
         xor ax, ax
         mov ss, ax                      ; Clear SS
@@ -91,17 +90,8 @@ main:
         ; also use BP as the end address for the primary partition table scan.
         mov bp, aa55_signature
 
-        ; GRUB and GRUB2 use DL, but with some kind of adjustment.  Follow the
-        ; GRUB2 convention and use DL if it's in the range 0x80-0x8f.
-        ; Otherwise, fall back to 0x80.
-        mov cl, 0xf0
-        and cl, dl
-        cmp cl, 0x80
-        je .dl_is_implausible
-        mov [bp + disk_number], dl
-.dl_is_implausible:
+        init_disk_number
 
-        ; Search the primary partition table for the pcboot VBR.
         mov si, mbr_ptable
 .primary_scan_loop:
         xor edx, edx
@@ -115,7 +105,9 @@ main:
         cmp byte [bp + no_match_yet], 0
         jne fail
 
+        ;
         ; Load the matching sector to 0x7c00 and jump.
+        ;
         mov esi, [bp + match_lba]
         call read_sector
         xor si, si
@@ -125,11 +117,15 @@ main:
 
 
 
+        ;
         ; Examine a single partition to see whether it is a matching pcboot
         ; VBR.  If it is one, update the global state (and potentially halt).
+        ;
         ; Inputs: si points to a partition entry
         ;         edx is a value to add to the entry's LBA
+        ;
         ; Trashes: esi(high), sector_buffer
+        ;
 scan_pcboot_vbr_partition:
         pusha
         ; Check the partition type.  Allowed types: 0x0b, 0x0c, 0x1b, 0x1c.
@@ -169,205 +165,7 @@ scan_pcboot_vbr_partition:
 
 
 
-        ; Scan a possible extended partition looking for logical pcboot VBRs.
-        ; Inputs: si points to a partition entry that might be an EBR
-        ; Trashes: esi(high), ecx(high), edx(high), sector_buffer
-scan_extended_partition:
-        pusha
-        mov ecx, [si + 8] ; ecx == start of entire extended partition
-        mov edx, ecx      ; edx == start of current EBR
-
-.loop:
-        ; At this point:
-        ;  - si points at an entry that might be an EBR.  It's either any entry
-        ;    in the MBR or the second entry of an EBR.
-        ;  - edx is the LBA of the referenced partition.
-
-        ; Check the partition type.  Allowed types: 0x05, 0x0f, 0x85.
-        mov al, [si + 4]
-        cmp al, 0x0f
-        je .match
-        and al, 0x7f
-        cmp al, 0x05
-        jne .done
-
-.match:
-        ; si points at an entry for a presumed EBR, whose LBA is in edx.  Read
-        ; the EBR from disk.
-        mov esi, edx
-        call read_sector
-
-        ; Verify that the EBR has the appropriate signature.
-        cmp word [sector_buffer + 512 - 2], 0xaa55
-        jne .done
-
-        ; Check the first partition for a pcboot VBR.
-        mov si, sector_buffer + 512 - 2 - 64
-        call scan_pcboot_vbr_partition
-
-        ; Advance to the next EBR.  We must reread the EBR because it was
-        ; trashed while scanning for a VBR.
-        mov esi, edx
-        call read_sector
-        mov si, sector_buffer + 512 - 2 - 64 + 16
-        mov edx, ecx
-        add edx, [si + 8]
-        jmp .loop
-
-.done:
-        popa
-        ret
-
-
-
-
-        ; Inputs: esi: the LBA of the sector to read.
-        ; Trashes: none
-read_sector:
-        pushad
-
-        ; Clear the sector buffer.  If the machine lacks INT13 extensions, and
-        ; our sector isn't addressable using CHS, then instead of aborting, we
-        ; "succeed" and pretend the sector was empty.  We don't want to abort
-        ; on an unreachable partition when the pcboot VBR *is* CHS-addressable.
-        mov di, sector_buffer
-        xor al, al
-        mov cx, 512
-        cld
-        rep stosb
-
-        ; Check for INT13 extensions.  According to RBIL, INT13/41h modifies
-        ; AX, BX, CX, DH, and the CF flag.  According to a GRUB2 comment, it
-        ; also trashes DL on some BIOS versions, such as "AST BIOS 1.04".
-        mov ah, 0x41
-        mov bx, 0x55aa
-        mov dl, [bp + disk_number]
-        int 0x13
-        jc .chs_fallback
-        cmp bx, 0xaa55
-        jne .chs_fallback
-
-        ; Issue the read using INT13/42h.
-        xor eax, eax
-        push eax
-        push esi
-        push ax
-        push word sector_buffer
-        push word 1
-        push word 16
-        mov ah, 0x42
-        mov dl, [bp + disk_number]
-        mov si, sp
-        int 0x13
-        jc fail
-        add sp, 16
-        jmp .done
-
-.chs_fallback:
-        ; Get CHS geometry.  According to RBIL, INT13/08h modifies AX, BL, CX,
-        ; DX, DI, and the CF flag.
-        mov ah, 8
-        mov dl, [bp + disk_number]
-        xor di, di
-        int 0x13
-        jc fail
-        test ah, ah
-        jnz fail
-
-        ; INT13/08h returns the geometry in these variables:
-        ;  - CH == Cm & 0xFF
-        ;  - CL == (Sm & 0x3f) | ((Cm & 0x300) >> 2)
-        ;  - DH == Hm
-        ; [CSH]m are maximum indices.
-        ;  - Sector indices start at one, so Sm is also the Sc (sectors/track).
-        ;  - Head indices start at zero, so Hc (tracks/cylinder) is Hm + 1.
-        ;  - Cylinder indices start at zero, so Cc (count of cylinders) is
-        ;    Cm + 1.
-
-        push dx
-
-        ; esi == LBA == (((Ci * Hc) + Hi) * Sc) + (Si - 1)
-
-        ; Divide LBA by Sc.
-        xor edx, edx
-        mov eax, esi
-        and ecx, 0x3f
-        div ecx
-
-        ; eax == (Ci * Hc) + Hi
-        ; edx == Si - 1
-
-        pop cx          ; post-invariant: cx == int13 dx
-        movzx ecx, ch   ; post-invariant: ecx == Hm
-        inc cx          ; post-invariant: ecx == Hc
-
-        inc dx
-        push dx         ; Push Si.
-
-        ; Divide eax by Hc.
-        xor edx, edx
-        div ecx
-
-        ; dx == Hi
-        ; eax == Ci
-
-        ; [*] intermediate value
-        pop cx                          ; [*] Set CL to Si.
-
-        ; Ci can exceed 0xffff, so we must use a 32-bit compare.  If the
-        ; sector is beyond the maximum cylinder, skip the write (and return a
-        ; buffer of all zeros.)
-        cmp eax, 1023
-        ja .done
-
-        ; ax == Ci
-
-        ; [*] intermediate value
-        mov ch, al                      ;     Set CH to (Ci & 0xff).
-        shl ah, 6                       ; [*] Set AH to (Ci & 0x300) >> 2.
-        or cl, ah                       ;     Set CL to Si | ((Ci & 0x300) >> 2).
-        mov dh, dl                      ;     Set DH to Hi.
-        mov dl, [bp + disk_number]
-        mov bx, sector_buffer
-        mov ax, 0x0201
-        int 0x13
-        jc fail
-
-.done:
-        popad
-        ret
-
-
-
-
-        ; Print a NUL-terminated string and hang.
-        ; Inputs: si: the address of the string to print.
-fail:
-        mov si, pcboot_error
-        call print_string
-        cli
-        hlt
-
-
-
-
-        ; Print a NUL-terminated string.
-        ; Inputs: si: the address of the string to print.
-        ; Trashes: none
-print_string:
-        pusha
-.loop:
-        mov al, [si]
-        test al, al
-        jz .done
-        mov ah, 0x0e
-        mov bx, 7
-        int 0x10
-        inc si
-        jmp .loop
-.done:
-        popa
-        ret
+%include "shared_items.s"
 
 
 
@@ -375,9 +173,6 @@ print_string:
 ;
 ; Initialized data
 ;
-
-pcboot_error:
-        db "pcboot error",0
 
 pcboot_vbr_marker:
         db "PCBOOT"
