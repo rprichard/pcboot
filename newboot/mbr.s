@@ -405,6 +405,7 @@ int13_dap:
         dw 0                    ; buffer segment
 .sect:  dq 0                    ; 64-bit sector LBA
 
+mbr_code_end:
         times 440-($-main) db 0
         dd 0            ; 32-bit disk signature
         dw 0            ; padding
