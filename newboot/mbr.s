@@ -53,10 +53,9 @@ sector_buffer:                  equ 0x7c00
 ; offsets access variables with undefined startup content.
 ;
 
-disk_number:                    equ disk_number_storage - aa55_signature
-no_match_yet:                   equ no_match_yet_storage - aa55_signature
-extra_storage_offset:           equ 2
-match_lba:                      equ extra_storage_offset + 0    ; dword
+disk_number:            equ disk_number_storage         - bp_address
+no_match_yet:           equ no_match_yet_storage        - bp_address
+match_lba:              equ match_lba_storage           - bp_address
 
 
 %include "shared_macros.s"
@@ -88,7 +87,7 @@ main:
 
         ; Use BP to access global variables with smaller memory operands.  We
         ; also use BP as the end address for the primary partition table scan.
-        mov bp, aa55_signature
+        mov bp, bp_address
 
         init_disk_number
 
@@ -98,6 +97,7 @@ main:
         call scan_pcboot_vbr_partition
         call scan_extended_partition
         add si, 0x10
+        static_assert_eq bp_address, aa55_signature
         cmp si, bp
         jne .primary_scan_loop
 
@@ -199,4 +199,18 @@ mbr_ptable:
         dd 0, 0, 0, 0
 
 aa55_signature:
+bp_address:
         dw 0xaa55
+
+
+
+
+;
+; Uninitialized data area.
+;
+; Variables here are not initialized at load-time.  They are still defined
+; using initialized data directives, because nasm insists on having initialized
+; data in a non-bss section.
+;
+
+match_lba_storage:      dd 0

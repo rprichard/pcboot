@@ -3,8 +3,6 @@
 ;  - byte [bp + disk_number] must be the BIOS boot disk number, statically
 ;    initialized to 0x80.
 ;
-;  - byte [bp + no_match_yet] must be statically initialized to 1.
-;
 
 
         ;
@@ -48,4 +46,10 @@
         mov dl, 0x80
 .dl_is_plausible:
         mov [bp + disk_number], dl
+%endmacro
+
+
+        ; Output an assembler error if the two operands are unequal.
+%macro static_assert_eq 2
+        times -!!((%1) - (%2)) db 0
 %endmacro

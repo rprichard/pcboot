@@ -30,9 +30,9 @@ stage1:                         equ 0x8000
 ; offset from the BP register.
 ;
 
-match_lba:                      equ 0    ; dword
-disk_number:                    equ 4    ; byte
-no_match_yet:                   equ 8    ; byte
+disk_number:            equ disk_number_storage         - bp_address
+no_match_yet:           equ no_match_yet_storage        - bp_address
+match_lba:              equ match_lba_storage           - bp_address
 
 
 %include "shared_macros.s"
@@ -59,7 +59,7 @@ main:
 
         ; Use BP to access global variables with smaller memory operands.  We
         ; also use BP as the end address for the primary partition table scan.
-        mov bp, uninitialized_variable_area
+        mov bp, bp_address
 
         ; Initialize globals.
         mov byte [bp + no_match_yet], 1
@@ -173,4 +173,19 @@ pcboot_error:
         db "PCBOOT"
         dw 0xaa55
 
-        uninitialized_variable_area:
+
+
+
+;
+; Uninitialized data area.
+;
+; Variables here are not initialized at load-time.  They are still defined
+; using initialized data directives, because nasm insists on having initialized
+; data in a non-bss section.
+;
+
+        bp_address:
+
+disk_number_storage:            db 0
+no_match_yet_storage:           db 0
+match_lba_storage:              dd 0

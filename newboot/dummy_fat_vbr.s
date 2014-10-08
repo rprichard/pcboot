@@ -3,7 +3,7 @@
 
 
 
-        section .vbr
+        section .boot_record
 
         global main
 main:

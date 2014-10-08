@@ -6,17 +6,17 @@
 
 set -e -x
 
-nasm -felf32 mbr.s -o mbr.o
-gold -static -Tmbr.ld -nostdlib --nmagic -o mbr.elf -Map mbr.map mbr.o
-objcopy -j.boot_record -Obinary mbr.elf mbr.bin
+boot_record() {
+    nasm -felf32 $1.s -o $1.o
+    gold -static -T$1.ld -nostdlib --nmagic -o $1.elf -Map $1.map $1.o
+    objcopy -j.boot_record -Obinary $1.elf $1-tmp.bin
+    dd if=$1-tmp.bin of=$1.bin bs=1 count=512
+    rm $1-tmp.bin
+}
 
-nasm -felf32 vbr.s -o vbr.o
-gold -static -Tvbr.ld -nostdlib --nmagic -o vbr.elf -Map vbr.map vbr.o
-objcopy -j.boot_record -Obinary vbr.elf vbr.bin
-
-nasm -felf32 dummy_fat_vbr.s -o dummy_fat_vbr.o
-gold -static -Tdummy_fat_vbr.ld -nostdlib --nmagic -o dummy_fat_vbr.elf -Map dummy_fat_vbr.map dummy_fat_vbr.o
-objcopy -j.vbr -Obinary dummy_fat_vbr.elf dummy_fat_vbr.bin
+boot_record mbr
+boot_record vbr
+boot_record dummy_fat_vbr
 
 nasm -felf32 stage1_entry.s -o stage1_entry.o
 gold -static -Tstage1.ld -nostdlib --nmagic -o stage1.elf -Map stage1.map stage1_entry.o
