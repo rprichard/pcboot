@@ -28,38 +28,44 @@
 ;     - Does the Direction Flag need to be cleared?
 ;
 
+
         bits 16
 
-        extern _stack_end
-        extern _mbr
-        extern _mbr_unrelocated
-        extern _vbr
 
-; Reuse the VBR chain address, 0x7c00, as the buffer
-sector_buffer:                  equ _vbr
+;
+; The address 0x7c00 serves three purposes in this program:
+;  - It is the program's initial address, where we must read to relocate to
+;    0x600.
+;  - It is the top of the stack.
+;  - Sectors are read into 0x7c00.  When we chain to the VBR, we don't have to
+;    move it to 0x7c00 before jumping.
+;
 
-        section .bss
+sector_buffer:                  equ 0x7c00
 
-; Reserve space for global variables.  These variables are not actually
-; zero-initialized, but putting them in a section named ".bss" silences nasm
-; warnings.
 
-_globals:
-match_lba_storage:              resd 1
+;
+; Global variables.
+;
+; For code size effiency, globals are accessed throughout the program using an
+; offset from the BP register.  BP points to the aa55_signature (at MBR offset
+; 510).  Negative offsets access statically initialized variables, and positive
+; offsets access variables with undefined startup content.
+;
 
-; BP offsets for global variables  (BP is _globals - 2)
-
-_bp_address:                    equ _globals - 2
 disk_number:                    equ disk_number_storage - aa55_signature
 no_match_yet:                   equ no_match_yet_storage - aa55_signature
-match_lba:                      equ match_lba_storage - _bp_address
+extra_storage_offset:           equ 2
+match_lba:                      equ extra_storage_offset + 0    ; dword
+
+
 
 
 ;
-; Executable code
+; Executable code and initialized data
 ;
 
-        section .mbr
+        section .boot_record
 
         global main
 main:
@@ -70,9 +76,9 @@ main:
         mov ss, ax                      ; Clear SS
         mov ds, ax                      ; Clear DS
         mov es, ax                      ; Clear ES
-        mov sp, _mbr_unrelocated        ; Set SP to 0x7c00
+        mov sp, sector_buffer           ; Set SP to 0x7c00
         mov si, sp
-        mov di, _mbr
+        mov di, main
         mov cx, 512
         cld
         rep movsb                       ; Copy MBR from 0x7c00 to 0x600.
@@ -83,7 +89,7 @@ main:
 
         ; Use BP to access global variables with smaller memory operands.  We
         ; also use BP as the end address for the primary partition table scan.
-        mov bp, _bp_address
+        mov bp, aa55_signature
 
         ; GRUB and GRUB2 use DL, but with some kind of adjustment.  Follow the
         ; GRUB2 convention and use DL if it's in the range 0x80-0x8f.
@@ -103,7 +109,7 @@ main:
         call scan_extended_partition
         add si, 0x10
         cmp si, bp
-        jnz .primary_scan_loop
+        jne .primary_scan_loop
 
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
@@ -114,7 +120,7 @@ main:
         call read_sector
         xor si, si
         mov dl, [bp + disk_number]
-        jmp _vbr
+        jmp sector_buffer
 
 
 
