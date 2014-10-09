@@ -59,5 +59,5 @@ hello_msg:
 
 
         times 504-($-main) db 0
-        db "PCBOOT"
+        db "toobcp"
         dw 0xaa55

@@ -176,13 +176,13 @@ scan_pcboot_vbr_partition:
 %include "shared_items.s"
 
 
+        times 512-2-6-6-($-main) db 0
+
+; Save code space by combining the pcboot marker and error message.
 pcboot_error:
-        db "pcbootV err",0
-
-
-        times 504-($-main) db 0
-
-        db "PCBOOT"
+        db 0,"5rre "
+        db "toobcp"
+pcboot_error_end:
         dw 0xaa55
 
 

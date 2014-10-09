@@ -198,31 +198,18 @@ scan_extended_partition:
 
 
 
-        ; Print a NUL-terminated string and hang.
-        ; Inputs: si: the address of the string to print.
+        ; Print an error and hang.  pcboot_error should be in reverse order.
 fail:
-        mov si, pcboot_error
-        call print_string
-        cli
-        hlt
-
-
-
-
-        ; Print a NUL-terminated string.
-        ; Inputs: si: the address of the string to print.
-        ; Trashes: none
-print_string:
-        pusha
+        mov si, pcboot_error_end
 .loop:
+        dec si
         mov al, [si]
         test al, al
         jz .done
         mov ah, 0x0e
         mov bx, 7
         int 0x10
-        inc si
         jmp .loop
 .done:
-        popa
-        ret
+        cli
+        hlt

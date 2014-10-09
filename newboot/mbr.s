@@ -182,11 +182,12 @@ scan_pcboot_vbr_partition:
 ; Initialized data
 ;
 
+; Save code space by combining the pcboot marker and error message.
 pcboot_error:
-        db "pcbootM err",0
-
+        db 0,"0rre "
 pcboot_vbr_marker:
-        db "PCBOOT"
+        db "toobcp"
+pcboot_error_end:
         dw 0xaa55
 
 mbr_code_end:
