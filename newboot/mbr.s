@@ -41,7 +41,9 @@
 ;    move it to 0x7c00 before jumping.
 ;
 
-sector_buffer:                  equ 0x7c00
+original_location:              equ 0x7c00
+stack:                          equ original_location
+sector_buffer:                  equ original_location
 
 
 ;
@@ -66,15 +68,21 @@ match_lba:              equ match_lba_storage           - bp_address
         global main
 main:
         ;
-        ; Setup the environment and relocate the code.  Be careful not to
-        ; trash DL, which still contains the BIOS boot disk number.
+        ; Setup the environment and relocate the code.
         ;
-        cli
+        ;  * Be careful not to trash DL, which still contains the BIOS boot
+        ;    disk number.
+        ;
+        ;  * According to Intel docs (286, 386, and contemporary), moving into
+        ;    SS masks interrupts until after the next instruction executes.
+        ;    Hence, this code avoids clearing interrupts.  (Saves one byte.)
+        ;
         xor ax, ax
-        mov ss, ax                      ; Clear SS
         mov ds, ax                      ; Clear DS
         mov es, ax                      ; Clear ES
-        mov sp, sector_buffer           ; Set SP to 0x7c00
+        mov ss, ax                      ; Clear SS
+        mov sp, stack                   ; Set SP to 0x7c00
+        static_assert_eq stack, original_location
         mov si, sp
         mov di, main
         mov cx, 512

@@ -15,6 +15,10 @@
 ;   0x7e00..0x7fff              uninitialized variables
 ;   0x8000..0x????              pcboot stage1 binary
 ;
+; This VBR does not initialize CS, and therefore, the stage1 binary must
+; be loaded *above* the 0x7c00 entry point.  (i.e. If the VBR is running at
+; 0x7c0:0, then we cannot jump before 0x7c00, but we can reach 0x7c0:0x400.)
+;
 
 mbr:                            equ 0x600
 sector_buffer:                  equ 0x800
@@ -44,17 +48,24 @@ match_lba:              equ match_lba_storage           - bp_address
 main:
         ;
         ; Prologue.  Skip FAT32 boot parameters, setup registers.
+        ;
+        ;  * According to Intel docs (286, 386, and contemporary), moving into
+        ;    SS masks interrupts until after the next instruction executes.
+        ;    Hence, this code avoids clearing interrupts.  (Saves one byte.)
+        ;
+        ;  * The CS register is not initialized.  It's possible that this code
+        ;    is running at 0x7c0:0 rather than 0:0x7c00.  The VBR can only use
+        ;    relative jumps.
+        ;
+
         jmp .skip_fat32_params
         times 90-($-main) db 0
 .skip_fat32_params:
-        cli
         xor ax, ax
-        mov ss, ax                      ; Clear SS
         mov ds, ax                      ; Clear DS
         mov es, ax                      ; Clear ES
+        mov ss, ax
         mov sp, stack
-        jmp 0:.start                    ; Ensure CS is 0.
-.start:
         sti
 
         ; Use BP to access global variables with smaller memory operands.  We
