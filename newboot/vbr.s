@@ -13,7 +13,8 @@
 ;   0x????..0x7bff              stack
 ;   0x7c00..0x7dff              pristine, executing VBR
 ;   0x7e00..0x7fff              uninitialized variables
-;   0x8000..0x????              pcboot stage1 binary
+;   ...
+;   0x8400..0x????              pcboot stage1 binary
 ;
 ; This VBR does not initialize CS, and therefore, the stage1 binary must
 ; be loaded *above* the 0x7c00 entry point.  (i.e. If the VBR is running at
@@ -24,7 +25,7 @@ mbr:                            equ 0x600
 sector_buffer:                  equ 0x800
 vbr:                            equ 0x7c00
 stack:                          equ 0x7c00
-stage1:                         equ 0x8000
+stage1:                         equ 0x8400
 
 
 ;
@@ -101,7 +102,7 @@ main:
         jne fail
 
         ;
-        ; Load the next 31 sectors of the volume to 0x8000.
+        ; Load the next 31 sectors of the volume to 0x8400.
         ;
         mov ebx, [bp + match_lba]
         mov di, stage1
@@ -119,7 +120,7 @@ main:
 
 .read_done:
         ;
-        ; Jump to 0x8000.  ebx points to the last sector (#30) of stage1.
+        ; Jump to 0x8400.  ebx points to the last sector (#30) of stage1.
         ;
         jmp stage1
 
