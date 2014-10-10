@@ -176,13 +176,14 @@ scan_pcboot_vbr_partition:
 %include "shared_items.s"
 
 
-        times 512-2-6-6-($-main) db 0
+        times 512-6-6-4-2-($-main) db 0
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
         db 0,"5rre "
-        db "toobcp"
+        db "toobcp"                     ; Marker text and error text
 pcboot_error_end:
+        db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
         dw 0xaa55
 
 

@@ -152,9 +152,9 @@ scan_pcboot_vbr_partition:
         ; ZF flag but otherwise leave registers alone.  (In particular, leave
         ; esi alone.)
         pusha
-        mov si, sector_buffer + 512 - 8
+        mov si, sector_buffer + 512 - pcboot_vbr_marker_size
         mov di, pcboot_vbr_marker
-        mov cx, 8
+        mov cx, pcboot_vbr_marker_size
         cld
         repe cmpsb
         popa
@@ -186,9 +186,11 @@ scan_pcboot_vbr_partition:
 pcboot_error:
         db 0,"0rre "
 pcboot_vbr_marker:
-        db "toobcp"
+        db "toobcp"                     ; Marker text
 pcboot_error_end:
-        dw 0xaa55
+        db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
+        dw 0xaa55                       ; PC bootable sector marker
+pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)
 
 mbr_code_end:
 

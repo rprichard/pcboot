@@ -58,6 +58,7 @@ hello_msg:
 
 
 
-        times 504-($-main) db 0
-        db "toobcp"
+        times 500-($-main) db 0
+        db "toobcp"                     ; Marker text
+        db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
         dw 0xaa55
