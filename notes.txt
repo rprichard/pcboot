@@ -169,3 +169,12 @@ Important design points:
  - Because the boot volume is FAT32, it can be modified using practically any
    OS/utility.  FAT32 is well specified and simple, which makes it easy for
    the pcboot boot-time code to modify its configuration.
+
+Restoring the MBR
+=================
+
+Given the current MBR/VBR design, there's an obvious way to restore the MBR
+after Windows overwrites it.  We can put installation logic into the "stage2"
+boot-time code.  Reaching that code is as simple as chaining to the VBR, and
+with the DOS/Windows MBR, that's easy--just set the pcboot partition's boot
+flag!  That can be done from any OS, a LiveCD, etc.
