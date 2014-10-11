@@ -1,5 +1,14 @@
 ; pcboot VBR.
 ;
+; TODO: Save VBR space by removing the 15.5KiB load loop.  Instead, load just
+; the first post-VBR sector.  As long as the VBR passes it the partition LBA,
+; it will have plenty of room to load the rest of stage1.  (In fact, it could
+; conceivably reuse the read_sector code from the VBR, given that the VBR and
+; post-VBR code are always installed together.)
+;
+; TODO: Improve error reporting by bumping up the error message's trailing
+; digit.
+;
 
 
         bits 16
