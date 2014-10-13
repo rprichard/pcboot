@@ -49,7 +49,7 @@ no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
 
 
-%include "shared_macros.s"
+%include "shared_macros.asm"
 
 
         section .boot_record
@@ -182,7 +182,7 @@ scan_pcboot_vbr_partition:
 
 
 
-%include "shared_items.s"
+%include "shared_items.asm"
 
 
         times 512-6-6-4-2-($-main) db 0
