@@ -3,9 +3,7 @@
 # Dependencies:
 #  - The mtools package (/usr/bin/mcopy)
 #  - The dosfstools package (mkfs.msdos)
-#  - /boot/memtest86+.bin
 #  - sfdisk
-#  - Python 3
 #  - qemu-system-x86_64
 
 set -e -x

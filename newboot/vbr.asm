@@ -78,8 +78,7 @@ main:
         mov sp, stack
         sti
 
-        ; Use BP to access global variables with smaller memory operands.  We
-        ; also use BP as the end address for the primary partition table scan.
+        ; Use BP to access global variables with smaller memory operands.
         mov bp, bp_address
 
         ; Initialize globals.
