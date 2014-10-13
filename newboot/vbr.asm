@@ -1,11 +1,5 @@
 ; pcboot VBR.
 ;
-; TODO: Save VBR space by removing the 15.5KiB load loop.  Instead, load just
-; the first post-VBR sector.  As long as the VBR passes it the partition LBA,
-; it will have plenty of room to load the rest of stage1.  (In fact, it could
-; conceivably reuse the read_sector code from the VBR, given that the VBR and
-; post-VBR code are always installed together.)
-;
 ; TODO: Improve error reporting by bumping up the error message's trailing
 ; digit.
 ;
@@ -17,13 +11,14 @@
 ;
 ; Memory layout:
 ;   0x600..0x7ff                MBR
-;   0x800..0x9ff                sector_buffer
 ;   ...
 ;   0x????..0x7bff              stack
 ;   0x7c00..0x7dff              pristine, executing VBR
 ;   0x7e00..0x7fff              uninitialized variables
+;   0x8000..0x81ff              sector read buffer
+;   0x8200..0x83ff              relocated stage1 load-loop
 ;   ...
-;   0x8400..0x????              pcboot stage1 binary
+;   0x9000..0x????              stage1
 ;
 ; This VBR does not initialize CS, and therefore, the stage1 binary must
 ; be loaded *above* the 0x7c00 entry point.  (i.e. If the VBR is running at
@@ -31,10 +26,11 @@
 ;
 
 mbr:                            equ 0x600
-sector_buffer:                  equ 0x800
 vbr:                            equ 0x7c00
 stack:                          equ 0x7c00
-stage1:                         equ 0x8400
+sector_buffer:                  equ 0x8000
+stage1_load_loop:               equ 0x8200
+stage1:                         equ 0x9000
 
 
 ;
@@ -110,27 +106,12 @@ main:
         jne fail
 
         ;
-        ; Load the next 31 sectors of the volume to 0x8400.
+        ; Load the next boot sector.
         ;
-        mov ebx, [bp + match_lba]
-        mov di, stage1
-        mov dl, 31
-.read_loop:
-        inc ebx
-        mov esi, ebx
+        mov esi, [bp + match_lba]
+        inc esi
         call read_sector
-        mov cx, 512
-        mov si, sector_buffer
-        cld
-        rep movsb
-        dec dl
-        jnz .read_loop
-
-.read_done:
-        ;
-        ; Jump to 0x8400.  ebx points to the last sector (#30) of stage1.
-        ;
-        jmp stage1
+        jmp sector_buffer
 
 
 
@@ -210,3 +191,53 @@ pcboot_error_end:
 disk_number_storage:            db 0
 no_match_yet_storage:           db 0
 match_lba_storage:              dd 0
+
+
+
+
+;
+; stage1 prep code area
+;
+; This post-VBR code is loaded by the VBR.  It reuses the code in the VBR to
+; load stage1.  As with the MBR code, this sector must be relocated first to
+; avoid being trampled by the next sector read.
+;
+
+        times (stage1_load_loop-vbr)-($-main) db 0
+
+stage1_load_loop_entry:
+        mov di, stage1_load_loop
+        mov si, sector_buffer
+        mov cx, 512
+        cld
+        rep movsb
+        jmp 0:.relocated                ; Ensure CS is zero.
+
+.relocated:
+        ;
+        ; Load the next 30 sectors of the volume to 0x9000.
+        ;
+        mov ebx, [bp + match_lba]
+        add ebx, 2
+        mov di, stage1
+        mov al, 30
+.read_loop:
+        mov esi, ebx
+        call read_sector
+        mov cx, 512
+        mov si, sector_buffer
+        cld
+        rep movsb
+        inc ebx
+        dec al
+        jnz .read_loop
+
+.read_done:
+        ;
+        ; Jump to stage1.
+        ;  - esi points to the starting LBA of the boot volume.
+        ;
+        mov esi, [bp + match_lba]
+        jmp stage1
+
+        times 512-($-stage1_load_loop_entry) db 0

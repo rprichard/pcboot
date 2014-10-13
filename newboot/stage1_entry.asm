@@ -1,8 +1,8 @@
 ; pcboot stage1
 ;
-; stage1 is the 15.5KiB program embedded in the FAT32 reserved area.
-;  - It is loaded at 0x8400.
-;  - (ebx - 31) gives the boot partition's LBA.
+; stage1 is the 15KiB program embedded in the FAT32 reserved area.
+;  - It is loaded at 0x9000.
+;  - esi gives the boot partition's LBA.
 ;
 
 

@@ -2,7 +2,7 @@ ENTRY(main);
 
 SECTIONS
 {
-    . = 0x8400;
+    . = 0x9000;
 
     .image : {
         *(.text);
