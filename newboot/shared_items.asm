@@ -10,6 +10,15 @@
 
 
 
+error_bias:                     equ 16
+disk_read_error:                equ error_bias + 0
+duplicate_vbr_error:            equ error_bias + 1
+missing_vbr_error:              equ error_bias + 2
+
+dap_size:                       equ 16
+
+
+
 
         ; Reads a sector to the 512-byte buffer at the "sector_buffer" address
         ; constant.  Tries to do an LBA write first, but if extensions aren't
@@ -49,23 +58,27 @@ read_sector:
         cmp bx, 0xaa55
         jne .chs_fallback
 
-        ; Issue the read using INT13/42h.
+        ; Issue the read using INT13/42h.  Push a 16 byte DAP (disk access
+        ; packet) onto the stack and pass it to BIOS.
         xor eax, eax
-        push eax
-        push esi
-        push ax
-        push word sector_buffer
-        push word 1
-        push word 16
+        push eax                        ; High 16 bits of sector index
+        push esi                        ; Low 32 bits of sector index
+        push ax                         ; Read buffer: segment 0
+        push word sector_buffer         ; Read buffer: address
+        push word 1                     ; Number of sectors to read: 1
+        push word dap_size              ; DAP size -- and push error code
+        static_assert_eq disk_read_error, dap_size
         mov ah, 0x42
         mov dl, [bp + disk_number]
         mov si, sp
         int 0x13
-        jc fail
+        jc fail                         ; Error code overlaps with DAP size
         add sp, 16
         jmp .done
 
 .chs_fallback:
+        push word disk_read_error       ; Push error code.
+
         ; Get CHS geometry.  According to RBIL, INT13/08h modifies AX, BL, CX,
         ; DX, DI, and the CF flag.
         mov ah, 8
@@ -135,6 +148,7 @@ read_sector:
         int 0x13
         jc fail
 
+        pop ax                          ; Pop error code.
 .done:
         popad
         ret
@@ -201,6 +215,8 @@ scan_extended_partition:
         ; Print an error and hang.  pcboot_error should be in reverse order.
 fail:
         mov si, pcboot_error_end
+        pop ax
+        add byte [si + pcboot_error - pcboot_error_end + 1], al
 .loop:
         dec si
         mov al, [si]

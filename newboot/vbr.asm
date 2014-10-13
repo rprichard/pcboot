@@ -1,8 +1,4 @@
 ; pcboot VBR.
-;
-; TODO: Improve error reporting by bumping up the error message's trailing
-; digit.
-;
 
 
         bits 16
@@ -103,6 +99,7 @@ main:
 
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
+        push word missing_vbr_error     ; Push error code. (No return.)
         jne fail
 
         ;
@@ -152,7 +149,9 @@ scan_pcboot_vbr_partition:
 
         ; We found a match!  Abort if this is the second match.
         dec byte [bp + no_match_yet]
+        push word duplicate_vbr_error   ; Push error code.
         jnz fail
+        pop ax                          ; Pop error code.
         mov [bp + match_lba], esi
 
 .done:
@@ -169,7 +168,7 @@ scan_pcboot_vbr_partition:
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
-        db 0,"5rre "
+        db 0, '5' - error_bias, "rre "
         db "toobcp"                     ; Marker text and error text
 pcboot_error_end:
         db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
