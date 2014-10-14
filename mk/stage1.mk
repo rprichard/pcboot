@@ -6,7 +6,6 @@ RUST_HASH := 4e7c5e5c
 
 RUST_OPTIONS := \
 	-O \
-	-C save-temps \
 	-C no-vectorize-loops \
 	-C no-vectorize-slp \
 
