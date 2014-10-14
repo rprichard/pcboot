@@ -1,6 +1,6 @@
 build/stage1/entry.o : stage1/entry.asm
 	mkdir -p $(dir $@)
-	nasm -felf32 $< -o $@ -MD build/stage1/entry.d
+	nasm -felf32 $< -o $@ -MD $@.d
 
 build/stage1.bin : build/stage1/entry.o
 	gold -static -nostdlib --nmagic \
@@ -12,4 +12,4 @@ build/stage1.bin : build/stage1/entry.o
 
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
 
--include build/stage1/entry.d
+-include build/stage1/entry.o.d
