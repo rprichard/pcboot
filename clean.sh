@@ -1,7 +1,5 @@
 #!/bin/sh
-fusermount -u bootvol-mnt 2>/dev/null || true
-rm -fr bootvol-mnt
-rm -f boot.bin boot.elf boot.map
-rm -f bootvol
-rm -f disk disk.setup
+rm -f bootvol bootvol.timestamp
+rm -f disk disk.setup disk.setup.1 disk.setup.2
+rm -f *.bin *.elf *.map
 rm -f *.o

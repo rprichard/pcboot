@@ -1,0 +1,7 @@
+boot.bin
+boot.elf
+boot.map
+*.o
+disk
+disk.setup
+bootvol

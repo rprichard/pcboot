@@ -1,41 +1,52 @@
 #!/bin/sh
 #
 # Dependencies:
-#  - The fuseext2 package (/usr/bin/fuseext2)
-#  - /boot/memtest86+.bin
+#  - The mtools package (/usr/bin/mcopy)
+#  - The dosfstools package (mkfs.msdos)
 #  - sfdisk
-#  - Python 3 (for install-boot)
 #  - qemu-system-x86_64
 
 set -e -x
 
 # Create the pcboot volume.
-fusermount -u bootvol-mnt 2>/dev/null || true
-rm -fr bootvol-mnt
 dd if=/dev/zero of=bootvol bs=1MiB count=63
-mkfs.ext3 -Fq bootvol
-mkdir bootvol-mnt
-mount.fuse fuseext2#bootvol bootvol-mnt -o rw+
-cp /boot/memtest86+.bin bootvol-mnt
-sync
-fusermount -u bootvol-mnt
+mkfs.msdos -F32 -h2048 bootvol
+mcopy -ibootvol /boot/memtest86+.bin ::/MEMTEST.BIN
+dd if=vbr.bin of=bootvol bs=1 conv=notrunc count=3
+dd if=vbr.bin of=bootvol bs=1 conv=notrunc count=422 seek=90 skip=90
+dd if=vbr.bin of=bootvol bs=1 conv=notrunc count=512 seek=512 skip=512
+dd if=stage1.bin of=bootvol bs=1 conv=notrunc seek=1024
 
 # Create the disk image.
 dd if=/dev/zero of=disk bs=1MiB count=64
-cat > disk.setup <<EOF
+cat > disk.setup.1 <<EOF
 # partition table of disk
 unit: sectors
 
-    disk1 : start=     2048, size=   129024, Id=83, bootable
+    disk1 : start=     2048, size=   129024, Id=1c, bootable
     disk2 : start=        0, size=        0, Id= 0
     disk3 : start=        0, size=        0, Id= 0
     disk4 : start=        0, size=        0, Id= 0
 EOF
-sfdisk -q --no-reread --force -C64 -H64 -S32 disk < disk.setup
+cat > disk.setup.2 <<EOF
+# partition table of disk
+unit: sectors
 
-# Copy the volume into the disk image.
+    disk1 : start=     1024, size=   130048, Id= 5
+    disk2 : start=        0, size=        0, Id= 0
+    disk3 : start=        0, size=        0, Id= 0
+    disk4 : start=        0, size=        0, Id= 0
+    disk5 : start=     1100, size=       90, Id=83
+    disk6 : start=     1200, size=       90, Id=83
+    disk7 : start=     2048, size=   129024, Id=1c
+EOF
+sfdisk -q --no-reread --force -C64 -H64 -S32 disk < disk.setup.1
+echo SUCCESS
+
+# Install the MBR and volume into the disk.
+dd if=mbr.bin of=disk bs=1 count=440 conv=notrunc
+dd if=mbr.bin of=disk bs=1 count=2 conv=notrunc seek=510 skip=510
 dd if=bootvol of=disk bs=1MiB seek=1 conv=notrunc
-./install-boot disk boot.bin
 
 # Launch qemu.
-qemu-system-x86_64 -hda disk -boot c
+qemu-system-x86_64 -hda disk

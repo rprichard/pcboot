@@ -2,29 +2,33 @@
 #
 # Dependencies:
 #  - nasm
-#  - gcc
 #  - binutils (gold-ld, objcopy)
 
 set -e -x
 
-asm_files="mbr_boot enable_a20 mode_switch io16"
-c_files="_main main io ext2 mem debug"
-objects=
+boot_record() {
+    nasm -felf32 $1.asm -o $1.o
+    gold -static -T$1.ld -nostdlib --nmagic -o $1.elf -Map $1.map $1.o
+}
 
-for file in $asm_files; do
-    nasm -felf32 $file.s -o $file.o
-    objects="$objects $file.o"
-done
+extract_sector() {
+    objcopy -j.boot_record -Obinary $1.elf $1-tmp.bin
+    dd if=$1-tmp.bin of=$1.bin bs=512 count=1 skip=$2 seek=$3
+    rm $1-tmp.bin
+}
 
-for file in $c_files; do
-    # TODO: consider adding -mregparm=3 for smaller code size.
-    gcc -std=c99 -Os -m32 -fomit-frame-pointer -ffreestanding -c $file.c -o $file.o -DBOOT_DEBUG
-    objects="$objects $file.o"
-done
+boot_record mbr
+extract_sector mbr 0 0
 
-gold -static -Tboot.ld -nostdlib --nmagic -o boot.elf -Map boot.map \
-    $objects
+boot_record vbr
+extract_sector vbr 0 0
+extract_sector vbr 3 1
 
-objcopy -R.bss -R.stack -Obinary boot.elf boot.bin
+boot_record dummy_fat_vbr
+extract_sector dummy_fat_vbr 0 0
+
+nasm -felf32 stage1_entry.asm -o stage1_entry.o
+gold -static -Tstage1.ld -nostdlib --nmagic -o stage1.elf -Map stage1.map stage1_entry.o
+objcopy -j.image -Obinary stage1.elf stage1.bin
 
 echo SUCCESS
