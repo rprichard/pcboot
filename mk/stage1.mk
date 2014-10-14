@@ -16,7 +16,7 @@ build/stage1/%.o : src/stage1/%.asm
 
 build/stage1/main.o : src/stage1/main.rs
 	mkdir -p $(dir $@)
-	$(RUST_CMD) $(RUST_OPTIONS) --emit obj $< -o $@
+	$(RUST_CMD) $(RUST_OPTIONS) --emit obj $< -o $@ --dep-info $@.d
 
 STAGE1_OBJECTS := \
 	build/shared/entry.o \
