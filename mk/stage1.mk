@@ -8,6 +8,7 @@ RUST_OPTIONS := \
 	-O \
 	-C no-vectorize-loops \
 	-C no-vectorize-slp \
+	-C relocation-model=static
 
 build/stage1/%.o : src/stage1/%.asm
 	mkdir -p $(dir $@)
