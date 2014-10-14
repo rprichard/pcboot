@@ -14,14 +14,14 @@ extern "C" {
     pub fn printchar(x: u8);
 }
 
-#[inline(never)] #[no_split_stack]
+#[inline(never)]
 fn printstr(text: &str) {
     for ch in text.as_bytes().iter() {
         unsafe { printchar(*ch); }
     }
 }
 
-#[no_mangle] #[no_split_stack]
+#[no_mangle]
 pub extern "C" fn pcboot_main() {
     printstr("pcboot loading...\r\n");
 }

@@ -24,7 +24,7 @@ STAGE1_OBJECTS := \
 	build/shared/printchar.o \
 	build/stage1/main.o
 
-build/stage1.bin : $(STAGE1_OBJECTS)
+build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 	gold -static -nostdlib --nmagic --gc-sections \
 		-T src/stage1/stage1.ld \
 		-o build/stage1/stage1.elf \
