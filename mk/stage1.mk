@@ -1,18 +1,13 @@
-build/stage1.bin : stage1/stage1.ld stage1/entry.asm
+build/stage1/entry.o : stage1/entry.asm
+	mkdir -p $(dir $@)
+	nasm -felf32 $< -o $@ -MD build/stage1/entry.d
 
-	mkdir -p build/stage1
-
-	nasm -felf32 stage1/entry.asm \
-		-o build/stage1/entry.elf \
-		-MD build/stage1/entry.d \
-		-MT build/stage1.bin
-
+build/stage1.bin : build/stage1/entry.o
 	gold -static -nostdlib --nmagic \
 		-T stage1/stage1.ld \
 		-o build/stage1/stage1.elf \
 		-Map build/stage1/stage1.map \
-		build/stage1/entry.elf
-
+		build/stage1/entry.o
 	objcopy -j.image -Obinary build/stage1/stage1.elf build/stage1.bin
 
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
