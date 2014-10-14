@@ -47,6 +47,11 @@ SECTIONS
         *(.data.*);
     }
 
+    .got : {
+        *(.got);
+        *(.got.*);
+    }
+
     .bss : {
         _bss = .;
         *(.bss);

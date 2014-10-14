@@ -32,7 +32,7 @@ build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 		$(RUST_LIB_PATH)/libcore-$(RUST_HASH).rlib \
 		$(RUST_LIB_PATH)/libmorestack.a \
 		$(RUST_LIB_PATH)/libcompiler-rt.a
-	objcopy -j.image -Obinary build/stage1/stage1.elf build/stage1.bin
+	objcopy -j.image -j.got -Obinary build/stage1/stage1.elf build/stage1.bin
 
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
 
