@@ -44,7 +44,7 @@ build/stage1/librlibc.rlib : $(RUST_SRC_PATH)/librlibc/lib.rs build/stage1/libco
 		-C no-stack-check \
 		--extern core=build/stage1/libcore.rlib
 
-build/stage1/main.rlib : src/stage1/main.rs build/stage1/libcore.rlib build/stage1/librlibc.rlib
+build/stage1/libstage1.rlib : src/stage1/lib.rs build/stage1/libcore.rlib build/stage1/librlibc.rlib
 	mkdir -p $(dir $@)
 	$(RUST_PROG) $(RUST_FLAGS) $< -o $@ --dep-info $@.d \
 		--extern core=build/stage1/libcore.rlib \
@@ -53,9 +53,9 @@ build/stage1/main.rlib : src/stage1/main.rs build/stage1/libcore.rlib build/stag
 STAGE1_OBJECTS := \
 	build/shared/entry.o \
 	build/shared/mode_switch.o \
-	build/shared/printchar.o \
 	build/shared/lowlevel.o \
-	build/stage1/main.rlib \
+	build/shared/io.o \
+	build/stage1/libstage1.rlib \
 	build/stage1/libcore.rlib \
 	build/stage1/librlibc.rlib
 

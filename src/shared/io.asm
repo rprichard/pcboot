@@ -2,6 +2,7 @@ extern call_real_mode
 
         section .text
 
+
         global printchar_32bit
 printchar_32bit:
         bits 32
@@ -12,6 +13,7 @@ printchar_32bit:
         pop eax
         ret
 
+
 printchar_16bit:
         bits 16
         mov ah, 0x0e
@@ -19,6 +21,7 @@ printchar_16bit:
         mov bx, 7
         int 0x10
         ret
+
 
         section .bss
 printchar_char:
