@@ -6,7 +6,6 @@
 
 extern crate core;
 use core::prelude::*;
-use core::fmt::FormatWriter;
 
 // Define a dummy std module that contains libcore's fmt module.  The fmt
 // module is needed to satisfy the fail macro's std::fmt::Arguments reference.
@@ -88,7 +87,9 @@ extern fn fail_fmt(msg: &std::fmt::Arguments, file: &'static str, line: uint) ->
             Ok(())
         }
     }
-    let _ = format_args_method!(&mut PrintWriter, write_fmt, "{}:{}: internal error: {}", file, line, msg);
+    let _ = format_args_method!(
+        &mut PrintWriter as &mut core::fmt::FormatWriter,
+        write_fmt, "{}:{}: internal error: {}", file, line, msg);
     halt();
 }
 
