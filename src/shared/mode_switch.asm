@@ -68,6 +68,11 @@ gdt:
         ; global variables.)
 
 
+        ; Kludge: force the entire mode switching mode to live in a single 4KiB
+        ; page by aligning the start of the code to 256 bytes.  It works
+        ; because the code is smaller than 256 bytes.
+        align 256
+
 global init_protected_mode
 init_protected_mode:
         bits 16
@@ -87,11 +92,7 @@ init_protected_mode:
         mov esp, _stack_end
         mov ax, (gdt.gsreg - gdt)
         mov gs, ax
-        call _pcboot_main
-        cli
-        hlt
-.loop:
-        jmp .loop
+        jmp _pcboot_main
 
 
         ;
@@ -106,11 +107,6 @@ init_protected_mode:
         ; TODO: I think flags from the real-mode call are preserved.  This is
         ; an important detail, so it should be documented one way or another.
         ;
-
-        ; TODO: Why is this align directive here?  It was in the older boot
-        ; code.  Maybe there are requirements like, "Don't cross a page
-        ; boundary" when switching modes?
-        align 256
 
 global call_real_mode
 call_real_mode:
