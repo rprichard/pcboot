@@ -2,8 +2,8 @@ extern call_real_mode
 
         section .text
 
-        global printchar
-printchar:
+        global printchar_32bit
+printchar_32bit:
         bits 32
         mov al, byte [esp + 4]
         mov byte [printchar_char], al

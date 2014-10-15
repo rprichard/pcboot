@@ -22,6 +22,7 @@ STAGE1_OBJECTS := \
 	build/shared/entry.o \
 	build/shared/mode_switch.o \
 	build/shared/printchar.o \
+	build/shared/lowlevel.o \
 	build/stage1/main.o
 
 build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld

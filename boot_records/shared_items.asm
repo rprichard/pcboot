@@ -227,5 +227,5 @@ fail:
         int 0x10
         jmp .loop
 .done:
-        cli
         hlt
+        jmp .done

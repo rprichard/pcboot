@@ -4,6 +4,7 @@ extern _stack_rust_limit
 extern _tls_stack_limit
 extern init_protected_mode
 extern pcboot_main
+extern halt_32bit_cli
 
 
 ;
@@ -45,4 +46,5 @@ _pcboot_main:
         mov [_tls_stack_limit], eax
 
         ; Jump into Rust.
-        jmp pcboot_main
+        call pcboot_main
+        jmp halt_32bit_cli
