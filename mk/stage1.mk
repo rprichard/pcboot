@@ -1,11 +1,27 @@
 # TODO: Use i386 instead of i686?
-RUST_PATH := /home/rprichard/work/rust-i686-unknown-linux-gnu
-RUST_LIB_PATH := $(RUST_PATH)/lib/rustlib/i686-unknown-linux-gnu/lib
-RUST_CMD := LD_LIBRARY_PATH=$(RUST_PATH)/lib $(RUST_PATH)/bin/rustc --target i686-unknown-linux-gnu
-RUST_HASH := 4e7c5e5c
 
-RUST_OPTIONS := \
-	-O \
+###############################################################################
+# Configurable Rust paths
+###############################################################################
+
+# Path to Rust distribution (for the Rust compiler).
+#RUST_PROG_PATH := /home/rprichard/work/rust/x86_64-unknown-linux-gnu/stage1
+RUST_PROG_PATH := /home/rprichard/work/rust-i686-unknown-linux-gnu
+
+# Path to Rust distribution (for Rust libraries).
+RUST_LIB_PATH := /home/rprichard/work/rust-i686-unknown-linux-gnu
+
+# Path to Rust src directory (for compiling libcore and librlibc libraries).
+RUST_SRC_PATH := /home/rprichard/work/rust/src
+
+###############################################################################
+
+RUST_PROG := LD_LIBRARY_PATH=$(RUST_PROG_PATH)/lib $(RUST_PROG_PATH)/bin/rustc
+RUST_TARGET_LIB_PATH := $(RUST_LIB_PATH)/lib/rustlib/i686-unknown-linux-gnu/lib
+
+RUST_FLAGS := \
+	--target i686-unknown-linux-gnu \
+	-O --opt-size \
 	-C no-vectorize-loops \
 	-C no-vectorize-slp \
 	-C relocation-model=static
@@ -14,16 +30,34 @@ build/stage1/%.o : src/stage1/%.asm
 	mkdir -p $(dir $@)
 	nasm -felf32 $< -o $@ -MD $@.d
 
-build/stage1/main.o : src/stage1/main.rs
+build/stage1/libcore.rlib : $(RUST_SRC_PATH)/libcore/lib.rs
 	mkdir -p $(dir $@)
-	$(RUST_CMD) $(RUST_OPTIONS) --emit obj $< -o $@ --dep-info $@.d
+	$(RUST_PROG) $(RUST_FLAGS) $< -o $@ --dep-info $@.d
+
+# Turn off stack checking for these simple byte-string functions.  It is
+# unnecessary, because they use much less stack then the amount reserved for
+# non-Rust code, and it is conceivable that the stack overflow code could call
+# into here.
+build/stage1/librlibc.rlib : $(RUST_SRC_PATH)/librlibc/lib.rs build/stage1/libcore.rlib
+	mkdir -p $(dir $@)
+	$(RUST_PROG) $(RUST_FLAGS) $< -o $@ --dep-info $@.d \
+		-C no-stack-check \
+		--extern core=build/stage1/libcore.rlib
+
+build/stage1/main.rlib : src/stage1/main.rs build/stage1/libcore.rlib build/stage1/librlibc.rlib
+	mkdir -p $(dir $@)
+	$(RUST_PROG) $(RUST_FLAGS) $< -o $@ --dep-info $@.d \
+		--extern core=build/stage1/libcore.rlib \
+		--extern rlibc=build/stage1/librlibc.rlib
 
 STAGE1_OBJECTS := \
 	build/shared/entry.o \
 	build/shared/mode_switch.o \
 	build/shared/printchar.o \
 	build/shared/lowlevel.o \
-	build/stage1/main.o
+	build/stage1/main.rlib \
+	build/stage1/libcore.rlib \
+	build/stage1/librlibc.rlib
 
 build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 	gold -static -nostdlib --nmagic --gc-sections \
@@ -31,9 +65,8 @@ build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 		-o build/stage1/stage1.elf \
 		-Map build/stage1/stage1.map \
 		$(STAGE1_OBJECTS) \
-		$(RUST_LIB_PATH)/libcore-$(RUST_HASH).rlib \
-		$(RUST_LIB_PATH)/libmorestack.a \
-		$(RUST_LIB_PATH)/libcompiler-rt.a
+		$(RUST_TARGET_LIB_PATH)/libmorestack.a \
+		$(RUST_TARGET_LIB_PATH)/libcompiler-rt.a
 	objcopy -j.image -j.got -Obinary build/stage1/stage1.elf build/stage1.bin
 
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
