@@ -1,15 +1,17 @@
 extern crate core;
 use core::prelude::*;
 
-extern "C" {
-    pub fn halt_32bit() -> !;
-}
-
 // Add no_split_stack to disable stack checking.  This function is used during
 // stack overflow handling.
-#[no_stack_check] #[inline]
+#[no_stack_check]
 fn halt() -> ! {
-    unsafe { halt_32bit(); }
+    extern "C" {
+        fn halt_16bit();
+        fn call_real_mode(callee: *mut ()) -> !;
+    }
+    unsafe {
+        call_real_mode(halt_16bit as *mut ());
+    }
 }
 
 #[lang = "eh_personality"]

@@ -72,6 +72,7 @@ gdt:
         ; page by aligning the start of the code to 256 bytes.  It works
         ; because the code is smaller than 256 bytes.
         align 256
+label_aligned_to_256:
 
 global init_protected_mode
 init_protected_mode:
@@ -96,82 +97,100 @@ init_protected_mode:
 
 
         ;
-        ; C prototype: void call_real_mode(void(*func)(void))
+        ; Switch to real mode, call "callee", switch back to protected mode,
+        ; and return.
         ;
-        ; Switch to real mode, call func, switch back to protected mode, and
-        ; return.
+        ; C prototype:
         ;
-        ; The .stack section must be located within the first 64 KiB of memory.
-        ; The SS register is initialized to 0 in 16-bit mode.
+        ;     [[u32 or u64]]
+        ;     call_real_mode(void (*callee)(), ...);
         ;
-        ; TODO: I think flags from the real-mode call are preserved.  This is
-        ; an important detail, so it should be documented one way or another.
+        ; The callee is invoked with BP pointing to the first callee argument
+        ; (i.e. the second argument to call_real_mode).  EAX/EDX are zero on
+        ; entry, and their value is returned to call_real_mode's caller.  The
+        ; callee is not required to preserve any of the eight GPRs except ESP.
+        ;
+        ; The "callee" function and the .stack section must be located within
+        ; the first 64 KiB of memory.  The SS register is initialized to 0 in
+        ; 16-bit mode.
         ;
 
 global call_real_mode
 call_real_mode:
         bits 32
-        push ebp
-        mov ebp, esp
-        sub esp, 12
+        sub esp, 16
 
-        ; Save non-volatile registers; func typically will call a BIOS routine,
-        ; which might(?) modify them.
-        mov [ebp-4], ebx
-        mov [ebp-8], esi
-        mov [ebp-12], edi
+        ; The callee function does not have to preserve these registers.
+        mov [esp], ebx
+        mov [esp+4], esi
+        mov [esp+8], edi
+        mov [esp+12], ebp
 
-        mov ecx, [ebp+8]        ; func argument
+        ; Clear the return value registers.  It is easier for the 16-bit callee
+        ; to not worry about the high 16-bits of these registers.
+        xor eax, eax
+        xor edx, edx
 
         ; Switch to real-mode.
-        jmp (gdt.code16 - gdt):.step2
-.step2:
+        jmp (gdt.code16 - gdt):.step1
+.step1:
         bits 16
-        mov ax, (gdt.data16 - gdt)
-        mov ds, ax
-        mov es, ax
-        mov fs, ax
-        mov gs, ax
-        mov ss, ax
-        mov eax, cr0
-        xor al, 1
-        mov cr0, eax
-        jmp 0:.step3
-.step3:
-        xor ax, ax
-        mov ds, ax
-        mov es, ax
-        mov fs, ax
-        mov gs, ax
-        mov ss, ax
+        mov si, (gdt.data16 - gdt)
+        mov ss, si
+        mov ds, si
+        mov es, si
+        mov fs, si
+        mov gs, si
+        mov esi, cr0
+        xor si, 1
+        mov cr0, esi
+        jmp 0:.step2
+.step2:
+        xor si, si
+        mov ss, si
+        mov ds, si
+        mov es, si
+        mov fs, si
+        mov gs, si
         sti
 
         ; Call the real-mode function.
-        push ebp
-        call cx
-        pop ebp
+        mov bp, sp
+        add bp, 24
+        call [bp - 4]
 
         ; Switch to protected mode.
         cli
         lgdt [gdt]
-        mov eax, cr0
-        xor al, 1
-        mov cr0, eax
-        jmp (gdt.code32 - gdt):.step1
-.step1:
+        mov esi, cr0
+        xor si, 1
+        mov cr0, esi
+        jmp (gdt.code32 - gdt):.step3
+.step3:
         bits 32
-        mov ax, (gdt.data32 - gdt)
-        mov ds, ax
-        mov es, ax
-        mov fs, ax
-        mov ss, ax
-        mov ax, (gdt.gsreg - gdt)
-        mov gs, ax
+        mov si, (gdt.data32 - gdt)
+        mov ss, si
+        mov ds, si
+        mov es, si
+        mov fs, si
+        mov si, (gdt.gsreg - gdt)
+        mov gs, si
 
-        ; Restore saved registers.  (Avoid use of esp -- it isn't valid here.)
-        mov ebx, [ebp-4]
-        mov esi, [ebp-8]
-        mov edi, [ebp-12]
+        ; Restore saved registers.
+        mov ebx, [esp]
+        mov esi, [esp+4]
+        mov edi, [esp+8]
+        mov ebp, [esp+12]
 
-        leave
+        ; The real-mode function is not required to leave the direction flag
+        ; cleared, and I do not know whether Rust/LLVM assume anything about
+        ; this flag.
+        cld
+
+        add sp, 16
         ret
+
+        ; Statically guarantee that all of the code in this file fits in a
+        ; single page, by padding the 256-byte aligned label to an amount no
+        ; greater than 256.
+        times (200 - ($ - label_aligned_to_256)) db 0
