@@ -17,7 +17,7 @@ extern fn eh_personality() {}
 
 #[lang = "stack_exhausted"]
 extern fn stack_exhausted() {
-    print!("internal error: stack exhausted! halting!\r\n");
+    ::io::print_str("internal error: stack exhausted! halting!\r\n");
     halt();
 }
 

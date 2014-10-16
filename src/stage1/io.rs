@@ -2,22 +2,31 @@ extern crate core;
 use core::prelude::*;
 
 extern "C" {
-    pub fn printchar_32bit(x: u8);
+    pub fn print_char_32bit(x: u8);
 }
 
-// Disable stack checking, because this function is used during stack overflow
-// handling.
+// Disable stack checking, because this function might be used during stack
+// overflow handling.
 #[no_stack_check] #[inline]
-pub fn printchar(ch: u8) {
-    unsafe { printchar_32bit(ch); }
+pub fn print_char(ch: u8) {
+    unsafe { print_char_32bit(ch); }
 }
 
-// Disable stack checking, because this function is used during stack overflow
-// handling.
+// Disable stack checking, because this function might be used during stack
+// overflow handling.
 #[no_stack_check] #[inline(never)]
-pub fn printstr(text: &str) {
+pub fn print_byte_str(text: &[u8]) {
+    for ch in text.iter() {
+        print_char(*ch);
+    }
+}
+
+// Disable stack checking, because this function might be used during stack
+// overflow handling.
+#[no_stack_check] #[inline(never)]
+pub fn print_str(text: &str) {
     for ch in text.as_bytes().iter() {
-        printchar(*ch);
+        print_char(*ch);
     }
 }
 
@@ -25,9 +34,7 @@ struct PrintWriter;
 
 impl core::fmt::FormatWriter for PrintWriter {
     fn write(&mut self, buf: &[u8]) -> core::fmt::Result {
-        for ch in buf.iter() {
-            ::io::printchar(*ch);
-        }
+        ::io::print_byte_str(buf);
         Ok(())
     }
 }
