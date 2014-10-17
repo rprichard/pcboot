@@ -31,9 +31,9 @@ mod lowlevel;
 pub extern "C" fn pcboot_main() -> ! {
     println!("pcboot loading...");
 
-    let mut buffer = io::BLANK_SECTOR;
+    let mut buffer = [0u8, ..io::SECTOR_SIZE];
     let disk = io::open_disk(0x80).unwrap();
-    io::read_disk_sector(&disk, 0, &mut buffer).unwrap();
+    io::read_disk_sectors(&disk, 0, &mut buffer).unwrap();
 
     for row in range(0, 16) {
         for col in range(0, 16) {

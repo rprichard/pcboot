@@ -1,6 +1,7 @@
 extern crate core;
 use core::prelude::*;
 use core::mem;
+use core::cmp;
 
 extern "C" {
     fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
@@ -53,8 +54,6 @@ pub fn print_args(args: &::std::fmt::Arguments) {
 
 pub const SECTOR_SIZE: uint = 512;
 pub type SectorIndex = u32;
-pub type SectorBuffer = [u8, ..SECTOR_SIZE];
-pub const BLANK_SECTOR: SectorBuffer = [0u8, ..SECTOR_SIZE];
 
 // When describing disk geometry, each field is a count.
 // When describing a sector index, each field is 0-based, including sector.
@@ -119,68 +118,102 @@ fn convert_lba_to_chs(lba: SectorIndex, geometry: &Chs) ->
     })
 }
 
-pub fn read_disk_sector(
-            disk: &Disk,
-            sector: SectorIndex,
-            buffer: &mut SectorBuffer) ->
-            Result<(), &'static str> {
+fn addr_linear_to_segmented(linear: u32) -> u32 {
+    // Ensure that the address if convertable to a 16-bit segment:offset far
+    // pointer.  Memory past 0x80000 is reserved[1] anyway, so use that as the
+    // limit for simplicity.
+    // [1] http://wiki.osdev.org/Memory_Map_(x86)#Overview
+    assert!(linear as u32 <= 0x80000);
+    let offset = linear % 16;
+    let segment = linear / 16;
+    (segment << 16) | offset
+}
 
-    // TODO: investigate alignment requirements on the buffer.
+pub fn read_disk_sectors(
+        disk: &Disk,
+        start_sector: SectorIndex,
+        buffer: &mut [u8]) ->
+        Result<(), &'static str> {
 
-    // Ensure that the entire sector (including the byte just past the buffer's
-    // end) is addressible using the 0 segment.
-    let buffer_u32 = buffer.as_mut_ptr() as u32;
-    assert!(buffer_u32 <= 0xfe00 - 1);
+    // Only allow reads of integral count of sectors.
+    assert!(buffer.len() % SECTOR_SIZE == 0);
 
-    match disk.io_method {
-        LbaMethod => unsafe {
-            // osdev claims that the buffer address must be 2-byte aligned.
-            // http://wiki.osdev.org/ATA_in_x86_RealMode_(BIOS)
-            assert!((buffer_u32 & 1) == 0);
-            #[repr(C)]
-            struct DiskAccessPacket {
-                size: u8,
-                reserved1: u8,
-                count: i8,
-                reserved2: u8,
-                buffer: u32,
-                lba: u32,
-                lba_high: u32,
-            }
-            let dap = DiskAccessPacket {
-                size: mem::size_of::<DiskAccessPacket>() as u8,
-                reserved1: 0,
-                count: 1,
-                reserved2: 0,
-                buffer: buffer_u32,
-                lba: sector,
-                lba_high: 0
-            };
-            if call_real_mode(
-                    read_disk_lba,
-                    disk.bios_number as u32,
-                    dap) as u8 == 0 {
-                Err("disk read error")
-            } else {
-                Ok(())
-            }
-        },
+    // osdev claims that the buffer address must be 2-byte aligned.
+    // http://wiki.osdev.org/ATA_in_x86_RealMode_(BIOS)
+    assert!(buffer.as_mut_ptr() as u32 % 2 == 0);
 
-        ChsMethod(geometry) => unsafe {
-            match convert_lba_to_chs(sector, &geometry) {
-                Ok(chs) => {
-                    if call_real_mode(
-                            read_disk_chs,
-                            disk.bios_number as u32,
-                            chs,
-                            buffer.as_mut_ptr()) as u8 == 0 {
-                        Err("disk read error")
-                    } else {
-                        Ok(())
-                    }
+    let sector_count = (buffer.len() / SECTOR_SIZE) as SectorIndex;
+
+    let mut loop_count: SectorIndex = sector_count;
+    let mut loop_sector: SectorIndex = start_sector;
+    let mut loop_buffer: u32 = buffer.as_mut_ptr() as u32;
+
+    // Ensure that even the byte past the end of the buffer is addressable
+    // using a 16-bit segment:offset far pointer.  (The function asserts that
+    // the linear address is convertible.)
+    let _ = addr_linear_to_segmented(loop_buffer + buffer.len() as u32);
+
+    while loop_count > 0 {
+        let mut iter_count: i8;
+
+        match disk.io_method {
+            LbaMethod => unsafe {
+                iter_count = cmp::min(loop_count, 127) as i8;
+                #[repr(C)]
+                struct DiskAccessPacket {
+                    size: u8,
+                    reserved1: u8,
+                    count: i8,
+                    reserved2: u8,
+                    buffer: u32,
+                    lba: u32,
+                    lba_high: u32,
                 }
-                Err(msg) => Err(msg)
+                let dap = DiskAccessPacket {
+                    size: mem::size_of::<DiskAccessPacket>() as u8,
+                    reserved1: 0,
+                    count: iter_count,
+                    reserved2: 0,
+                    buffer: addr_linear_to_segmented(loop_buffer),
+                    lba: loop_sector,
+                    lba_high: 0
+                };
+                if call_real_mode(
+                        read_disk_lba,
+                        disk.bios_number as u32,
+                        dap) as u8 == 0 {
+                    return Err("disk read error");
+                }
+            },
+
+            ChsMethod(geometry) => unsafe {
+                match convert_lba_to_chs(loop_sector, &geometry) {
+                    Ok(chs) => {
+                        // For maximum compatibility, avoid doing a read that
+                        // crosses a track boundary.
+                        iter_count =
+                            cmp::min(loop_count,
+                                (geometry.sector - chs.sector) as SectorIndex)
+                                    as i8;
+                        if call_real_mode(
+                                read_disk_chs,
+                                disk.bios_number as u32,
+                                chs,
+                                iter_count as u32,
+                                addr_linear_to_segmented(loop_buffer))
+                                as u8 == 0 {
+                            return Err("disk read error");
+                        }
+                    },
+                    Err(msg) => { return Err(msg) }
+                }
             }
         }
+
+        loop_sector += iter_count as SectorIndex;
+        loop_count -= iter_count as SectorIndex;
+        loop_buffer += iter_count as u32 * SECTOR_SIZE as u32;
     }
+
+    Ok(())
 }
