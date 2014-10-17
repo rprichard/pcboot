@@ -20,6 +20,29 @@ dap_size:                       equ 16
 
 
 
+%macro define_fail_routine 0
+        ; Print an error and hang.  pcboot_error should be in reverse order.
+fail:
+        mov si, pcboot_error_end
+        pop ax
+        add byte [si + pcboot_error - pcboot_error_end + 1], al
+.loop:
+        dec si
+        mov al, [si]
+        test al, al
+        jz short .done
+        mov ah, 0x0e
+        mov bx, 7
+        int 0x10
+        jmp short .loop
+.done:
+        hlt
+        jmp short .done
+%endmacro
+
+
+
+
         ; Reads a sector to the 512-byte buffer at the "sector_buffer" address
         ; constant.  Tries to do an LBA write first, but if extensions aren't
         ; supported, the routine falls back to a CHS write.
@@ -54,9 +77,9 @@ read_sector:
         mov bx, 0x55aa
         mov dl, [bp + disk_number]
         int 0x13
-        jc short .chs_fallback
+        jc short read_sector_chs_fallback
         cmp bx, 0xaa55
-        jne short .chs_fallback
+        jne short read_sector_chs_fallback
 
         ; Issue the read using INT13/42h.  Push a 16 byte DAP (disk access
         ; packet) onto the stack and pass it to BIOS.
@@ -72,11 +95,22 @@ read_sector:
         mov dl, [bp + disk_number]
         mov si, sp
         int 0x13
-        jc fail                         ; Error code overlaps with DAP size
+        jc short fail                   ; Error code overlaps with DAP size
         add sp, 16
-        jmp short .done
+        jmp short read_sector_chs_fallback.done
 
-.chs_fallback:
+
+        ;
+        ; The fail routine is located in the center of read_sector to optimize
+        ; jump instruction sizes.
+        ;
+        define_fail_routine
+
+
+        ;
+        ; Second half of the read_sector function.
+        ;
+read_sector_chs_fallback:
         push word disk_read_error       ; Push error code.
 
         ; Get CHS geometry.  According to RBIL, INT13/08h modifies AX, BL, CX,
@@ -85,9 +119,9 @@ read_sector:
         mov dl, [bp + disk_number]
         xor di, di
         int 0x13
-        jc fail
+        jc short fail
         test ah, ah
-        jnz fail
+        jnz short fail
 
         ; INT13/08h returns the geometry in these variables:
         ;  - CH == Cm & 0xFF
@@ -146,7 +180,7 @@ read_sector:
         mov bx, sector_buffer
         mov ax, 0x0201
         int 0x13
-        jc fail
+        jc short fail
 
         pop ax                          ; Pop error code.
 .done:
@@ -206,24 +240,3 @@ scan_extended_partition:
 .done:
         popa
         ret
-
-
-
-
-        ; Print an error and hang.  pcboot_error should be in reverse order.
-fail:
-        mov si, pcboot_error_end
-        pop ax
-        add byte [si + pcboot_error - pcboot_error_end + 1], al
-.loop:
-        dec si
-        mov al, [si]
-        test al, al
-        jz short .done
-        mov ah, 0x0e
-        mov bx, 7
-        int 0x10
-        jmp short .loop
-.done:
-        hlt
-        jmp short .done

@@ -112,7 +112,7 @@ main:
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
         push word missing_vbr_error     ; Push error code. (No return.)
-        jne fail
+        jne short fail
 
         ;
         ; Load the matching sector to 0x7c00 and jump.
@@ -164,7 +164,7 @@ scan_pcboot_vbr_partition:
         ; We found a match!  Abort if this is the second match.
         dec byte [bp + no_match_yet]
         push word duplicate_vbr_error   ; Push error code.
-        jnz fail
+        jnz short fail
         pop ax                          ; Pop error code.
         mov [bp + match_lba], esi
 
