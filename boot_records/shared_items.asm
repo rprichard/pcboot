@@ -60,10 +60,10 @@ read_sector:
 
         ; Issue the read using INT13/42h.  Push a 16 byte DAP (disk access
         ; packet) onto the stack and pass it to BIOS.
-        xor eax, eax
-        push eax                        ; High 16 bits of sector index
+        push ds                         ; Reserved (0)
+        push ds                         ; High 16 bits of sector index (0)
         push esi                        ; Low 32 bits of sector index
-        push ax                         ; Read buffer: segment 0
+        push ds                         ; Read buffer: segment 0
         push word sector_buffer         ; Read buffer: address
         push word 1                     ; Number of sectors to read: 1
         push word dap_size              ; DAP size -- and push error code
