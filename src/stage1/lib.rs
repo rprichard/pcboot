@@ -14,6 +14,7 @@ use core::prelude::*;
 // Import macros in this single place.  The module is marked #![macro_escape],
 // so all the macros are copied into this scope.  They will be inherited by all
 // the successive modules.
+#[path = "../shared/macros.rs"]
 mod macros;
 
 // Define a dummy std module that contains libcore's fmt module.  The std::fmt
@@ -24,8 +25,8 @@ mod std {
     pub use core::fmt;
 }
 
-mod io;
-mod lowlevel;
+#[path = "../shared/io.rs"]             mod io;
+#[path = "../shared/lowlevel.rs"]       mod lowlevel;
 
 #[no_mangle]
 pub extern "C" fn pcboot_main() -> ! {
