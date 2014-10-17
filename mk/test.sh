@@ -50,5 +50,25 @@ dd if=build/mbr.bin of=test/disk bs=1 count=440 conv=notrunc
 dd if=build/mbr.bin of=test/disk bs=1 count=2 conv=notrunc seek=510 skip=510
 dd if=test/bootvol of=test/disk bs=1MiB seek=1 conv=notrunc
 
+# Prepare a VMDK file for VirtualBox.
+do_virtualbox_disk() {
+    qemu-img convert -O vmdk test/disk test/disk.vmdk
+    VBoxManage internalcommands sethduuid test/disk.vmdk 885d9adc-5f17-4bef-a28e-76d4ebefcc88
+}
+
 # Launch qemu.
-qemu-system-x86_64 -hda test/disk
+do_qemu() {
+    qemu-system-x86_64 -hda test/disk
+}
+
+# Launch bochs.  (Install bochs and bochs-sdl Ubuntu packages.)
+do_bochs() {
+cat > test/bochsrc.txt << EOF
+boot:disk
+ata0-master: type=disk, path=disk, cylinders=64, heads=64, spt=32
+display_library: sdl
+EOF
+    cd test && bochs
+}
+
+do_qemu
