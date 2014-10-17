@@ -130,7 +130,7 @@ read_sector:
         pop cx                          ; [*] Set CL to Si.
 
         ; Ci can exceed 0xffff, so we must use a 32-bit compare.  If the
-        ; sector is beyond the maximum cylinder, skip the write (and return a
+        ; sector is beyond the maximum cylinder, skip the read (and return a
         ; buffer of all zeros.)
         cmp eax, 1023
         ja .done
