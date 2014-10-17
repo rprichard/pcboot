@@ -195,12 +195,12 @@ read_sector_chs_fallback:
         ; Inputs: bx points to a partition entry that might be an EBR.
         ;         bx may point into sector_buffer.
         ;
-        ; Trashes: esi(high), ecx(high), sector_buffer
+        ; Trashes: esi(high), edx(high), sector_buffer
         ;
 scan_extended_partition:
         pusha
-        mov ecx, [bx + 8] ; ecx == start of entire extended partition
-        mov esi, ecx      ; esi == start of current EBR
+        mov edx, [bx + 8] ; edx == start of entire extended partition
+        mov esi, edx      ; esi == start of current EBR
 
 .loop:
         ; At this point:
@@ -233,7 +233,7 @@ scan_extended_partition:
         ; trashed while scanning for a VBR.
         call read_sector
         mov bx, sector_buffer + 512 - 2 - 64 + 16
-        mov esi, ecx
+        mov esi, edx
         add esi, [bx + 8]
         jmp short .loop
 
