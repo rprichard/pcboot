@@ -101,7 +101,7 @@ main:
 
         mov bx, mbr_ptable
 .primary_scan_loop:
-        xor edx, edx
+        xor esi, esi
         call scan_pcboot_vbr_partition
         call scan_extended_partition
         add bx, 0x10
@@ -131,12 +131,12 @@ main:
         ; VBR.  If it is one, update the global state (and potentially halt).
         ;
         ; Inputs: bx points to a partition entry
-        ;         edx is a value to add to the entry's LBA
+        ;         esi is a value to add to the entry's LBA
         ;
-        ; Trashes: esi(high), sector_buffer
+        ; Trashes: sector_buffer
         ;
 scan_pcboot_vbr_partition:
-        pusha
+        pushad
         ; Check the partition type.  Allowed types: 0x0b, 0x0c, 0x1b, 0x1c.
         mov al, [bx + 4]
         and al, 0xef
@@ -145,8 +145,7 @@ scan_pcboot_vbr_partition:
         ja .done
 
         ; Look for the appropriate 8-byte signature at the end of the VBR.
-        mov esi, [bx + 8]
-        add esi, edx
+        add esi, [bx + 8]
         call read_sector
 
         ; Test whether the sector we just read has the pcboot marker.  Set the
@@ -170,7 +169,7 @@ scan_pcboot_vbr_partition:
         mov [bp + match_lba], esi
 
 .done:
-        popa
+        popad
         ret
 
 

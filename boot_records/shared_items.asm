@@ -161,18 +161,18 @@ read_sector:
         ; Inputs: bx points to a partition entry that might be an EBR.
         ;         bx may point into sector_buffer.
         ;
-        ; Trashes: esi(high), ecx(high), edx(high), sector_buffer
+        ; Trashes: esi(high), ecx(high), sector_buffer
         ;
 scan_extended_partition:
         pusha
         mov ecx, [bx + 8] ; ecx == start of entire extended partition
-        mov edx, ecx      ; edx == start of current EBR
+        mov esi, ecx      ; esi == start of current EBR
 
 .loop:
         ; At this point:
         ;  - bx points at an entry that might be an EBR.  It's either any entry
         ;    in the MBR or the second entry of an EBR.
-        ;  - edx is the LBA of the referenced partition.
+        ;  - esi is the LBA of the referenced partition.
 
         ; Check the partition type.  Allowed types: 0x05, 0x0f, 0x85.
         mov al, [bx + 4]
@@ -183,9 +183,8 @@ scan_extended_partition:
         jne .done
 
 .match:
-        ; bx points at an entry for a presumed EBR, whose LBA is in edx.  Read
+        ; bx points at an entry for a presumed EBR, whose LBA is in esi.  Read
         ; the EBR from disk.
-        mov esi, edx
         call read_sector
 
         ; Verify that the EBR has the appropriate signature.
@@ -198,11 +197,10 @@ scan_extended_partition:
 
         ; Advance to the next EBR.  We must reread the EBR because it was
         ; trashed while scanning for a VBR.
-        mov esi, edx
         call read_sector
         mov bx, sector_buffer + 512 - 2 - 64 + 16
-        mov edx, ecx
-        add edx, [bx + 8]
+        mov esi, ecx
+        add esi, [bx + 8]
         jmp .loop
 
 .done:
