@@ -74,6 +74,10 @@ gdt:
         align 256
 label_aligned_to_256:
 
+        ;
+        ; This function must pass through the EDX and ESI registers to the next
+        ; startup function.
+        ;
 global init_protected_mode
 init_protected_mode:
         bits 16

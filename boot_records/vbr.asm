@@ -234,8 +234,10 @@ stage1_load_loop_entry:
 .read_done:
         ;
         ; Jump to stage1.
+        ;  - dl is the BIOS disk number.
         ;  - esi points to the starting LBA of the boot volume.
         ;
+        mov dl, byte [bp + disk_number]
         mov esi, [bp + match_lba]
         jmp stage1
 

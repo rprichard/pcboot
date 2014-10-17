@@ -11,6 +11,8 @@ extern pcboot_main
 ;
 ; Guarantees on entry:
 ;  - stage1: IP is 0x9000, the address at which the image is loaded.
+;  - stage1: DL is the BIOS disk number
+;  - stage1: ESI is the LBA of the pcboot volume.
 ;  - CS, DS, and ES registers are all zeroed.
 ;
 ; This file will be listed first on the linker command-line.
@@ -45,7 +47,10 @@ _pcboot_main:
         mov [_tls_stack_limit], eax
 
         ; Jump into Rust.
-        jmp pcboot_main
+        movzx edx, dl
+        push esi
+        push edx
+        call pcboot_main
 .loop:
         hlt
         jmp .loop

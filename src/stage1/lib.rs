@@ -29,14 +29,14 @@ mod std {
 #[path = "../shared/lowlevel.rs"]       mod lowlevel;
 
 #[no_mangle]
-pub extern "C" fn pcboot_main() -> ! {
+pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
     println!("pcboot loading...");
 
     let mut buffer = [0u8, ..io::SECTOR_SIZE];
-    let disk = io::open_disk(0x80).unwrap();
-    io::read_disk_sectors(&disk, 0, &mut buffer).unwrap();
+    let disk = io::open_disk(disk_number).unwrap();
+    io::read_disk_sectors(&disk, volume_lba, &mut buffer).unwrap();
 
-    for row in range(0, 16) {
+    for row in range(16, 32) {
         for col in range(0, 16) {
             print!("{:02x} ", buffer[row * 16 + col]);
         }
