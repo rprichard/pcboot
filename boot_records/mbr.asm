@@ -107,7 +107,7 @@ main:
         add bx, 0x10
         static_assert_eq bp_address, aa55_signature
         cmp bx, bp
-        jne .primary_scan_loop
+        jne short .primary_scan_loop
 
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
@@ -142,7 +142,7 @@ scan_pcboot_vbr_partition:
         and al, 0xef
         sub al, 0x0b
         cmp al, 1
-        ja .done
+        ja short .done
 
         ; Look for the appropriate 8-byte signature at the end of the VBR.
         add esi, [bx + 8]
@@ -159,7 +159,7 @@ scan_pcboot_vbr_partition:
         repe cmpsb
         popa
 
-        jne .done
+        jne short .done
 
         ; We found a match!  Abort if this is the second match.
         dec byte [bp + no_match_yet]

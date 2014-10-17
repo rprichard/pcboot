@@ -24,7 +24,7 @@
         mov cl, 0xf0
         and cl, dl
         cmp cl, 0x80
-        jne .dl_is_implausible
+        jne short .dl_is_implausible
         mov [bp + disk_number], dl
 .dl_is_implausible:
 %endmacro
@@ -42,7 +42,7 @@
         mov cl, 0xf0
         and cl, dl
         cmp cl, 0x80
-        je .dl_is_plausible
+        je short .dl_is_plausible
         mov dl, 0x80
 .dl_is_plausible:
         mov [bp + disk_number], dl

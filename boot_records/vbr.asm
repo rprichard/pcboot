@@ -60,7 +60,7 @@ main:
         ;    relative jumps.
         ;
 
-        jmp .skip_fat32_params
+        jmp short .skip_fat32_params
         times 90-($-main) db 0
 .skip_fat32_params:
         xor ax, ax
@@ -95,7 +95,7 @@ main:
         call scan_extended_partition
         add bx, 0x10
         cmp bx, mbr + 510
-        jne .primary_scan_loop
+        jne short .primary_scan_loop
 
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
@@ -129,7 +129,7 @@ scan_pcboot_vbr_partition:
         and al, 0xef
         sub al, 0x0b
         cmp al, 1
-        ja .done
+        ja short .done
 
         ; Load the VBR.
         add esi, [bx + 8]
@@ -144,7 +144,7 @@ scan_pcboot_vbr_partition:
         rep cmpsb
         popa
 
-        jne .done
+        jne short .done
 
         ; We found a match!  Abort if this is the second match.
         dec byte [bp + no_match_yet]
@@ -228,7 +228,7 @@ stage1_load_loop_entry:
         rep movsb
         inc ebx
         dec al
-        jnz .read_loop
+        jnz short .read_loop
 
 .read_done:
         ;

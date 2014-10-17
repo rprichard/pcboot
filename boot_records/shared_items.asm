@@ -54,9 +54,9 @@ read_sector:
         mov bx, 0x55aa
         mov dl, [bp + disk_number]
         int 0x13
-        jc .chs_fallback
+        jc short .chs_fallback
         cmp bx, 0xaa55
-        jne .chs_fallback
+        jne short .chs_fallback
 
         ; Issue the read using INT13/42h.  Push a 16 byte DAP (disk access
         ; packet) onto the stack and pass it to BIOS.
@@ -74,7 +74,7 @@ read_sector:
         int 0x13
         jc fail                         ; Error code overlaps with DAP size
         add sp, 16
-        jmp .done
+        jmp short .done
 
 .chs_fallback:
         push word disk_read_error       ; Push error code.
@@ -133,7 +133,7 @@ read_sector:
         ; sector is beyond the maximum cylinder, skip the read (and return a
         ; buffer of all zeros.)
         cmp eax, 1023
-        ja .done
+        ja short .done
 
         ; ax == Ci
 
@@ -177,10 +177,10 @@ scan_extended_partition:
         ; Check the partition type.  Allowed types: 0x05, 0x0f, 0x85.
         mov al, [bx + 4]
         cmp al, 0x0f
-        je .match
+        je short .match
         and al, 0x7f
         cmp al, 0x05
-        jne .done
+        jne short .done
 
 .match:
         ; bx points at an entry for a presumed EBR, whose LBA is in esi.  Read
@@ -189,7 +189,7 @@ scan_extended_partition:
 
         ; Verify that the EBR has the appropriate signature.
         cmp word [sector_buffer + 512 - 2], 0xaa55
-        jne .done
+        jne short .done
 
         ; Check the first partition for a pcboot VBR.
         mov bx, sector_buffer + 512 - 2 - 64
@@ -201,7 +201,7 @@ scan_extended_partition:
         mov bx, sector_buffer + 512 - 2 - 64 + 16
         mov esi, ecx
         add esi, [bx + 8]
-        jmp .loop
+        jmp short .loop
 
 .done:
         popa
@@ -219,11 +219,11 @@ fail:
         dec si
         mov al, [si]
         test al, al
-        jz .done
+        jz short .done
         mov ah, 0x0e
         mov bx, 7
         int 0x10
-        jmp .loop
+        jmp short .loop
 .done:
         hlt
-        jmp .done
+        jmp short .done
