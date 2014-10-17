@@ -99,14 +99,14 @@ main:
 
         init_disk_number
 
-        mov si, mbr_ptable
+        mov bx, mbr_ptable
 .primary_scan_loop:
         xor edx, edx
         call scan_pcboot_vbr_partition
         call scan_extended_partition
-        add si, 0x10
+        add bx, 0x10
         static_assert_eq bp_address, aa55_signature
-        cmp si, bp
+        cmp bx, bp
         jne .primary_scan_loop
 
         ; If we didn't find a match, fail at this point.
@@ -130,7 +130,7 @@ main:
         ; Examine a single partition to see whether it is a matching pcboot
         ; VBR.  If it is one, update the global state (and potentially halt).
         ;
-        ; Inputs: si points to a partition entry
+        ; Inputs: bx points to a partition entry
         ;         edx is a value to add to the entry's LBA
         ;
         ; Trashes: esi(high), sector_buffer
@@ -138,14 +138,14 @@ main:
 scan_pcboot_vbr_partition:
         pusha
         ; Check the partition type.  Allowed types: 0x0b, 0x0c, 0x1b, 0x1c.
-        mov al, [si + 4]
+        mov al, [bx + 4]
         and al, 0xef
         sub al, 0x0b
         cmp al, 1
         ja .done
 
         ; Look for the appropriate 8-byte signature at the end of the VBR.
-        mov esi, [si + 8]
+        mov esi, [bx + 8]
         add esi, edx
         call read_sector
 

@@ -158,24 +158,24 @@ read_sector:
 
         ; Scan a possible extended partition looking for logical pcboot VBRs.
         ;
-        ; Inputs: si points to a partition entry that might be an EBR.
-        ;         si may point into sector_buffer.
+        ; Inputs: bx points to a partition entry that might be an EBR.
+        ;         bx may point into sector_buffer.
         ;
         ; Trashes: esi(high), ecx(high), edx(high), sector_buffer
         ;
 scan_extended_partition:
         pusha
-        mov ecx, [si + 8] ; ecx == start of entire extended partition
+        mov ecx, [bx + 8] ; ecx == start of entire extended partition
         mov edx, ecx      ; edx == start of current EBR
 
 .loop:
         ; At this point:
-        ;  - si points at an entry that might be an EBR.  It's either any entry
+        ;  - bx points at an entry that might be an EBR.  It's either any entry
         ;    in the MBR or the second entry of an EBR.
         ;  - edx is the LBA of the referenced partition.
 
         ; Check the partition type.  Allowed types: 0x05, 0x0f, 0x85.
-        mov al, [si + 4]
+        mov al, [bx + 4]
         cmp al, 0x0f
         je .match
         and al, 0x7f
@@ -183,7 +183,7 @@ scan_extended_partition:
         jne .done
 
 .match:
-        ; si points at an entry for a presumed EBR, whose LBA is in edx.  Read
+        ; bx points at an entry for a presumed EBR, whose LBA is in edx.  Read
         ; the EBR from disk.
         mov esi, edx
         call read_sector
@@ -193,16 +193,16 @@ scan_extended_partition:
         jne .done
 
         ; Check the first partition for a pcboot VBR.
-        mov si, sector_buffer + 512 - 2 - 64
+        mov bx, sector_buffer + 512 - 2 - 64
         call scan_pcboot_vbr_partition
 
         ; Advance to the next EBR.  We must reread the EBR because it was
         ; trashed while scanning for a VBR.
         mov esi, edx
         call read_sector
-        mov si, sector_buffer + 512 - 2 - 64 + 16
+        mov bx, sector_buffer + 512 - 2 - 64 + 16
         mov edx, ecx
-        add edx, [si + 8]
+        add edx, [bx + 8]
         jmp .loop
 
 .done:
