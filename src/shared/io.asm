@@ -100,7 +100,7 @@ get_disk_geometry:
         ;
         ; Arguments:
         ; [bp+0] disk: u8
-        ; [bp+4] dap: &io::DiskAccessPacket
+        ; [bp+4] dap: io::DiskAccessPacket (16 bytes)
         ;
         ; Return: 1 on success, 0 on failure
         ;
@@ -108,7 +108,7 @@ get_disk_geometry:
 read_disk_lba:
         mov ah, 0x42
         mov dl, [bp + 0]
-        mov si, [bp + 4]
+        lea si, [bp + 4]
         int 0x13
         jc .fail
         mov eax, 1
@@ -121,8 +121,8 @@ read_disk_lba:
         ;
         ; Arguments:
         ; [bp+0] disk: u8
-        ; [bp+4] sector: &io::Chs
-        ; [bp+8] buffer: &mut io::SectorBuffer
+        ; [bp+4] sector: io::Chs (6 bytes)
+        ; [bp+12] buffer: *mut u8
         ;
         ;    struct Chs {
         ;        cylinder: u16,
@@ -134,7 +134,7 @@ read_disk_lba:
         ;
         global read_disk_chs
 read_disk_chs:
-        mov si, [bp + 4]
+        lea si, [bp + 4]
         mov ax, 0x0201
         mov ch, byte [si + 0]   ; cylinder's low 8 bits
         mov cl, byte [si + 1]   ; cylinder's high 2 bits
@@ -143,7 +143,7 @@ read_disk_chs:
         inc cl                  ; make sector one-based (1 - 63)
         mov dh, byte [si + 2]   ; head
         mov dl, [bp + 0]        ; disk
-        mov bx, [bp + 8]        ; buffer
+        mov bx, [bp + 12]       ; buffer
         int 0x13
         jc .fail
         mov eax, 1

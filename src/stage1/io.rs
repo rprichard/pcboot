@@ -2,16 +2,21 @@ extern crate core;
 use core::prelude::*;
 use core::mem;
 
+extern "C" {
+    fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
+    fn print_char_16bit();
+    fn check_for_int13_extensions();
+    fn get_disk_geometry();
+    fn read_disk_lba();
+    fn read_disk_chs();
+}
+
 // Disable stack checking, because this function might be used during stack
 // overflow handling.
 #[no_stack_check] #[inline(never)]
 pub fn print_char(ch: u8) {
-    extern "C" {
-        fn print_char_16bit();
-        fn call_real_mode(callee: *mut (), ch: u32);
-    }
     unsafe {
-        call_real_mode(print_char_16bit as *mut (), ch as u32);
+        call_real_mode(print_char_16bit, ch as u32);
     }
 }
 
@@ -72,33 +77,22 @@ struct Disk {
 
 pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
     let has_int13_extensions = unsafe {
-        extern "C" {
-            fn check_for_int13_extensions();
-            fn call_real_mode(
-                callee: unsafe extern "C" fn(),
-                disk: u8) -> u32;
-        }
-        call_real_mode(check_for_int13_extensions, bios_disk_number) != 0
+        call_real_mode(
+            check_for_int13_extensions,
+            bios_disk_number as u32) as u8 != 0
     };
-    if (has_int13_extensions) {
+    if has_int13_extensions {
         Ok(Disk {
             bios_number: bios_disk_number,
             io_method: LbaMethod
         })
     } else {
-        extern "C" {
-            fn get_disk_geometry();
-            fn call_real_mode(
-                callee: unsafe extern "C" fn(),
-                disk: u8,
-                geometry: &mut Chs) -> u32;
-        }
         unsafe {
             let mut geometry = Chs { cylinder: 0, head: 0, sector: 0 };
-            if (call_real_mode(
+            if call_real_mode(
                     get_disk_geometry,
-                    bios_disk_number,
-                    &mut geometry) == 0) {
+                    bios_disk_number as u32,
+                    &mut geometry) as u8 == 0 {
                 return Err("cannot read disk geometry");
             }
             Ok(Disk {
@@ -153,13 +147,6 @@ pub fn read_disk_sector(
                 lba: u32,
                 lba_high: u32,
             }
-            extern "C" {
-                fn read_disk_lba();
-                fn call_real_mode(
-                    callee: unsafe extern "C" fn(),
-                    disk: u8,
-                    dap: &DiskAccessPacket) -> u32;
-            }
             let dap = DiskAccessPacket {
                 size: mem::size_of::<DiskAccessPacket>() as u8,
                 reserved1: 0,
@@ -169,7 +156,10 @@ pub fn read_disk_sector(
                 lba: sector,
                 lba_high: 0
             };
-            if (call_real_mode(read_disk_lba, disk.bios_number, &dap) == 0) {
+            if call_real_mode(
+                    read_disk_lba,
+                    disk.bios_number as u32,
+                    dap) as u8 == 0 {
                 Err("disk read error")
             } else {
                 Ok(())
@@ -177,21 +167,13 @@ pub fn read_disk_sector(
         },
 
         ChsMethod(geometry) => unsafe {
-            extern "C" {
-                fn read_disk_chs();
-                fn call_real_mode(
-                    callee: unsafe extern "C" fn(),
-                    disk: u8,
-                    sector: &Chs,
-                    buffer: &mut SectorBuffer) -> u32;
-            }
             match convert_lba_to_chs(sector, &geometry) {
                 Ok(chs) => {
-                    if (call_real_mode(
+                    if call_real_mode(
                             read_disk_chs,
-                            disk.bios_number,
-                            &chs,
-                            buffer) == 0) {
+                            disk.bios_number as u32,
+                            chs,
+                            buffer.as_mut_ptr()) as u8 == 0 {
                         Err("disk read error")
                     } else {
                         Ok(())

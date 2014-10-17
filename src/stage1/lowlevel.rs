@@ -1,16 +1,22 @@
 extern crate core;
 use core::prelude::*;
 
+extern "C" {
+    fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
+    fn halt_16bit();
+}
+
 // Add no_split_stack to disable stack checking.  This function is used during
 // stack overflow handling.
 #[no_stack_check]
 fn halt() -> ! {
-    extern "C" {
-        fn halt_16bit();
-        fn call_real_mode(callee: *mut ()) -> !;
-    }
     unsafe {
-        call_real_mode(halt_16bit as *mut ());
+        call_real_mode(halt_16bit);
+
+        // Make the rustc compiler happy.  It thinks call_real_mode can return.
+        // Changing the declaration of call_real_mode is hard -- rust issue
+        // #12707.
+        loop {}
     }
 }
 
