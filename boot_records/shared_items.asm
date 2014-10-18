@@ -26,12 +26,11 @@
 ; 'A'.  Disk read errors do not immediately abort the loader, but if/when a
 ; fatal error occurs (e.g. cannot find VBR), the error is incremented by one.
 ;
-error_bias:                     equ 16
-geometry_error:                 equ error_bias + 0
-duplicate_vbr_error:            equ error_bias + 2
-missing_vbr_error:              equ error_bias + 4
-missing_post_vbr_marker_error:  equ error_bias + 6
-read_error:                     equ error_bias + 8
+geometry_error:                 equ error_char + 0
+duplicate_vbr_error:            equ error_char + 2
+missing_vbr_error:              equ error_char + 4
+missing_post_vbr_marker_error:  equ error_char + 6
+read_error:                     equ error_char + 8
 
 dap_size:                       equ 16
 
@@ -48,18 +47,18 @@ maximum_logical_partitions:     equ 127
 %macro define_fail_routine 0
         ; Print an error and hang.  pcboot_error should be in reverse order.
 fail:
-        mov si, pcboot_error_end
+        mov si, pcboot_error
         pop ax
         add al, [bp + read_error_flag]
-        add byte [si + pcboot_error - pcboot_error_end + 1], al
+        mov byte [si + pcboot_error_char - pcboot_error], al
 .loop:
-        dec si
         mov al, [si]
         test al, al
         jz short .done
         mov ah, 0x0e
         mov bx, 7
         int 0x10                        ; Live GPRs: SI
+        inc si
         jmp short .loop
 .done:
         hlt

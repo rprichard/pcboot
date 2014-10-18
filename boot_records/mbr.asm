@@ -54,6 +54,7 @@ disk_number:            equ disk_number_storage         - bp_address
 no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
 read_error_flag:        equ read_error_flag_storage     - bp_address
+error_char:             equ '0'
 
 
 %include "shared_macros.asm"
@@ -184,10 +185,10 @@ scan_pcboot_vbr_partition:
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
-        db 0, '0' - error_bias, "rre "
 pcboot_vbr_marker:
-        db "toobcp"                     ; Marker text
-pcboot_error_end:
+        db "pcboot err"
+pcboot_error_char:
+        db 0, 0           ; Marker and error text
         db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
         dw 0xaa55                       ; PC bootable sector marker
 pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)

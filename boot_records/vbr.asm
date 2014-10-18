@@ -45,6 +45,7 @@ no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
 read_error_flag:        equ read_error_flag_storage     - bp_address
 no_match_yet_read_error_flag: equ no_match_yet_read_error_flag_storage - bp_address
+error_char:             equ 'A'
 
 
 %include "shared_macros.asm"
@@ -189,13 +190,11 @@ scan_pcboot_vbr_partition:
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
-        db 0, 'A' - error_bias, "rre "
-pcboot_marker:
-        db "toobcp"                     ; Marker text and error text
-pcboot_error_end:
+        db "pcboot err"
+pcboot_error_char:
+        db 0, 0           ; Marker and error text
         db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
         dw 0xaa55
-pcboot_marker_end:
 
 
 
