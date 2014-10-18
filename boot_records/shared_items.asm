@@ -82,10 +82,8 @@ read_sector:
         ; our sector isn't addressable using CHS, then instead of aborting, we
         ; "succeed" and pretend the sector was empty.  We don't want to abort
         ; on an unreachable partition when the pcboot VBR *is* CHS-addressable.
-        mov di, sector_buffer
+        set_di_to_sector_buffer_and_cx_to_512_and_cld
         xor al, al
-        mov cx, 512
-        cld
         rep stosb
 
         ; Check for INT13 extensions.  According to RBIL, INT13/41h modifies

@@ -44,6 +44,11 @@ match_lba:              equ match_lba_storage           - bp_address
 %include "shared_macros.asm"
 
 
+%macro set_di_to_sector_buffer_and_cx_to_512_and_cld 0
+        call func_set_di_to_sector_buffer_and_cx_to_512_and_cld
+%endmacro
+
+
         section .boot_record
 
         global main
@@ -115,10 +120,9 @@ main:
         ; Perhaps a partitioning tool could fail to preserve the reserved
         ; area's contents.
         ;
+        set_di_to_sector_buffer_and_cx_to_512_and_cld
         mov si, pcboot_marker
-        mov di, sector_buffer
         mov cx, pcboot_marker_end - pcboot_marker
-        cld
         rep cmpsb
         push word missing_post_vbr_marker_error         ; Push error code. (No return.)
         jne short fail
@@ -152,9 +156,7 @@ scan_pcboot_vbr_partition:
         ; Check whether the VBR matches our own VBR.  Don't trash esi.
         pusha
         mov si, vbr
-        mov di, sector_buffer
-        mov cx, 512
-        cld
+        set_di_to_sector_buffer_and_cx_to_512_and_cld
         rep cmpsb
         popa
 
@@ -175,6 +177,22 @@ scan_pcboot_vbr_partition:
 
 
 %include "shared_items.asm"
+
+
+
+
+        ;
+        ; Code size optimization.  With three callers, it ultimate saves one
+        ; byte versus inlining these instructions.  Only two of the three
+        ; callers want cx set to 512.
+        ;
+func_set_di_to_sector_buffer_and_cx_to_512_and_cld:
+        mov di, sector_buffer
+        mov cx, 512
+        cld
+        ret
+
+
 
 
         times 512-6-6-4-2-($-main) db 0

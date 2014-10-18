@@ -58,6 +58,13 @@ match_lba:              equ match_lba_storage           - bp_address
 %include "shared_macros.asm"
 
 
+%macro set_di_to_sector_buffer_and_cx_to_512_and_cld 0
+        mov di, sector_buffer
+        mov cx, 512
+        cld
+%endmacro
+
+
         section .boot_record
 
         global main
