@@ -20,11 +20,17 @@
 
 
 
+;
+; When an error is printed, the value here is added to the character on the end
+; of the error string.  MBR errors start with '0', and VBR errors start with
+; 'A'.  Disk read errors do not immediately abort the loader, but if/when a
+; fatal error occurs (e.g. cannot find VBR), the error is incremented by one.
+;
 error_bias:                     equ 16
-disk_read_error:                equ error_bias + 0
-duplicate_vbr_error:            equ error_bias + 1
-missing_vbr_error:              equ error_bias + 2
-missing_post_vbr_marker_error:  equ error_bias + 3
+geometry_error:                 equ error_bias + 0
+duplicate_vbr_error:            equ error_bias + 2
+missing_vbr_error:              equ error_bias + 4
+missing_post_vbr_marker_error:  equ error_bias + 6
 
 dap_size:                       equ 16
 
@@ -43,6 +49,7 @@ maximum_logical_partitions:     equ 127
 fail:
         mov si, pcboot_error_end
         pop ax
+        add al, [bp + read_error_flag]
         add byte [si + pcboot_error - pcboot_error_end + 1], al
 .loop:
         dec si
@@ -78,13 +85,7 @@ fail:
 read_sector:
         pushad
 
-        ; Clear the sector buffer.  If the machine lacks INT13 extensions, and
-        ; our sector isn't addressable using CHS, then instead of aborting, we
-        ; "succeed" and pretend the sector was empty.  We don't want to abort
-        ; on an unreachable partition when the pcboot VBR *is* CHS-addressable.
-        set_di_to_sector_buffer_and_cx_to_512_and_cld
-        xor al, al
-        rep stosb
+        call clear_sector_buffer
 
         ; Check for INT13 extensions.  According to RBIL, INT13/41h modifies
         ; AX, BX, CX, DH, and the CF flag.  According to a GRUB2 comment, it
@@ -105,14 +106,14 @@ read_sector:
         push ds                         ; Read buffer: segment 0
         push word sector_buffer         ; Read buffer: address
         push word 1                     ; Number of sectors to read: 1
-        push word dap_size              ; DAP size -- and push error code
-        static_assert_eq disk_read_error, dap_size
+        push word dap_size              ; DAP size
         mov ah, 0x42
         mov dl, [bp + disk_number]
         mov si, sp
         int 0x13                        ; Live GPRs: BP, SP
-        jc short fail                   ; Error code overlaps with DAP size
         add sp, 16
+        jnc short read_sector_chs_fallback.done
+        call handle_read_error
         jmp short read_sector_chs_fallback.done
 
 
@@ -127,7 +128,7 @@ read_sector:
         ; Second half of the read_sector function.
         ;
 read_sector_chs_fallback:
-        push word disk_read_error       ; Push error code.
+        push word geometry_error        ; Push error code.
 
         ; Get CHS geometry.  According to RBIL, INT13/08h modifies AX, BL, CX,
         ; DX, DI, and the CF flag.
@@ -196,7 +197,9 @@ read_sector_chs_fallback:
         mov bx, sector_buffer
         mov ax, 0x0201
         int 0x13                        ; Live GPRs: BP, SP
-        jc short fail
+        jnc short .success
+        call handle_read_error
+.success:
 
         pop ax                          ; Pop error code.
 .done:
@@ -256,4 +259,19 @@ scan_extended_partition:
 
 .done:
         popa
+        ret
+
+
+
+
+handle_read_error:
+        mov byte [bp + read_error_flag], 1
+clear_sector_buffer:
+        ; Clear the sector buffer.  If the machine lacks INT13 extensions, and
+        ; our sector isn't addressable using CHS, then instead of aborting, we
+        ; "succeed" and pretend the sector was empty.  We don't want to abort
+        ; on an unreachable partition when the pcboot VBR *is* CHS-addressable.
+        set_di_to_sector_buffer_and_cx_to_512_and_cld
+        xor al, al
+        rep stosb
         ret

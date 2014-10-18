@@ -39,6 +39,7 @@ stage1:                         equ 0x9000
 disk_number:            equ disk_number_storage         - bp_address
 no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
+read_error_flag:        equ read_error_flag_storage     - bp_address
 
 
 %include "shared_macros.asm"
@@ -80,6 +81,7 @@ main:
 
         ; Initialize globals.
         mov byte [bp + no_match_yet], 1
+        mov byte [bp + read_error_flag], 0
 
         init_disk_number_dynamic
 
@@ -199,7 +201,7 @@ func_set_di_to_sector_buffer_and_cx_to_512_and_cld:
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
-        db 0, '5' - error_bias, "rre "
+        db 0, 'A' - error_bias, "rre "
 pcboot_marker:
         db "toobcp"                     ; Marker text and error text
 pcboot_error_end:
@@ -223,6 +225,7 @@ pcboot_marker_end:
 disk_number_storage:            db 0
 no_match_yet_storage:           db 0
 match_lba_storage:              dd 0
+read_error_flag_storage:        db 0
 
 
 

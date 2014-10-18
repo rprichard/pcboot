@@ -53,6 +53,7 @@ sector_buffer:                  equ original_location
 disk_number:            equ disk_number_storage         - bp_address
 no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
+read_error_flag:        equ read_error_flag_storage     - bp_address
 
 
 %include "shared_macros.asm"
@@ -198,10 +199,11 @@ pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)
 
 mbr_code_end:
 
-        times 438-($-main) db 0
+        times 437-($-main) db 0
 
-disk_number_storage:    db 0x80
-no_match_yet_storage:   db 0x01
+disk_number_storage:            db 0x80
+no_match_yet_storage:           db 0x01
+read_error_flag_storage:        db 0x00
 
 disk_signature:
         dd 0            ; 32-bit disk signature
