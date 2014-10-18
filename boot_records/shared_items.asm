@@ -7,6 +7,16 @@
 ;  - sector_buffer must be an integral assembler constant referring to a 512
 ;    byte buffer to read sectors into.
 ;
+; BIOS register assumptions:
+;
+;  - Each int instruction has a comment documenting the general-purpose
+;    registers required to be preserved (i.e. Live GPRs).
+;
+;  - BIOS calls are not relied upon to preserve the Direction Flag.
+;
+;  - Ralph Brown's Interrupt List (RBIL) tries to document which registers each
+;    interrupt function changes.
+;
 
 
 
@@ -40,7 +50,7 @@ fail:
         jz short .done
         mov ah, 0x0e
         mov bx, 7
-        int 0x10
+        int 0x10                        ; Live GPRs: SI
         jmp short .loop
 .done:
         hlt
@@ -83,7 +93,7 @@ read_sector:
         mov ah, 0x41
         mov bx, 0x55aa
         mov dl, [bp + disk_number]
-        int 0x13
+        int 0x13                        ; Live GPRs: ESI, BP, SP
         jc short read_sector_chs_fallback
         cmp bx, 0xaa55
         jne short read_sector_chs_fallback
@@ -101,7 +111,7 @@ read_sector:
         mov ah, 0x42
         mov dl, [bp + disk_number]
         mov si, sp
-        int 0x13
+        int 0x13                        ; Live GPRs: BP, SP
         jc short fail                   ; Error code overlaps with DAP size
         add sp, 16
         jmp short read_sector_chs_fallback.done
@@ -125,7 +135,7 @@ read_sector_chs_fallback:
         mov ah, 8
         mov dl, [bp + disk_number]
         xor di, di
-        int 0x13
+        int 0x13                        ; Live GPRs: ESI, BP, SP
         jc short fail
         test ah, ah
         jnz short fail
@@ -186,7 +196,7 @@ read_sector_chs_fallback:
         mov dl, [bp + disk_number]
         mov bx, sector_buffer
         mov ax, 0x0201
-        int 0x13
+        int 0x13                        ; Live GPRs: BP, SP
         jc short fail
 
         pop ax                          ; Pop error code.
