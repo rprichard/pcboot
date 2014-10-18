@@ -45,7 +45,13 @@ maximum_logical_partitions:     equ 127
 
 
 %macro define_fail_routine 0
+        ;
         ; Print an error and hang.  pcboot_error should be in reverse order.
+        ;
+        ; Bootloader code commonly assumes that INT 10h/0Eh will not trash SI,
+        ; so that assumption is safe.  For example, FreeBSD's boot0.S and GRUB2
+        ; make this assumption.
+        ;
 fail:
         mov si, pcboot_error
         pop ax
