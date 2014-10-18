@@ -1,4 +1,8 @@
 ; pcboot VBR.
+;
+; TODO:
+;  - Compute a checksum of stage1 before jumping into it.
+;
 
 
         bits 16
