@@ -17,6 +17,13 @@ missing_vbr_error:              equ error_bias + 2
 
 dap_size:                       equ 16
 
+;
+; The maximum number of logical partitions to examine.  This code only examines
+; a finite number of partitions to guard against an infinite loop in a corrupt
+; table.  The chosen number is mostly arbitrary.
+;
+maximum_logical_partitions:     equ 127
+
 
 
 
@@ -201,6 +208,7 @@ scan_extended_partition:
         pusha
         mov edx, [bx + 8] ; edx == start of entire extended partition
         mov esi, edx      ; esi == start of current EBR
+        mov cx, maximum_logical_partitions
 
 .loop:
         ; At this point:
@@ -235,7 +243,7 @@ scan_extended_partition:
         mov bx, sector_buffer + 512 - 2 - 64 + 16
         mov esi, edx
         add esi, [bx + 8]
-        jmp short .loop
+        loop .loop
 
 .done:
         popa
