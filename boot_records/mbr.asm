@@ -142,7 +142,7 @@ scan_pcboot_vbr_partition:
         cmp al, 1
         ja short .done
 
-        ; Look for the appropriate 8-byte signature at the end of the VBR.
+        ; Look for the pcboot marker at the end of the VBR.
         add esi, [bx + 8]
         call read_sector
 

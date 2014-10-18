@@ -69,6 +69,7 @@ fail:
 
 
 
+        ;
         ; Reads a sector to the 512-byte buffer at the "sector_buffer" address
         ; constant.  Tries to do an LBA write first, but if extensions aren't
         ; supported, the routine falls back to a CHS write.
@@ -84,6 +85,7 @@ fail:
         ; Inputs: esi: the LBA of the sector to read.
         ; Outputs: CF is set on error and clear on success.
         ; Trashes: none
+        ;
 read_sector:
         pushad
 
