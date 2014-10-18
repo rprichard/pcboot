@@ -52,13 +52,13 @@ fail:
         add al, [bp + read_error_flag]
         mov byte [si + pcboot_error_char - pcboot_error], al
 .loop:
-        mov al, [si]
+        cld
+        lodsb
         test al, al
         jz short .done
         mov ah, 0x0e
         mov bx, 7
         int 0x10                        ; Live GPRs: SI
-        inc si
         jmp short .loop
 .done:
         hlt
