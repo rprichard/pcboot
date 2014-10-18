@@ -1,14 +1,23 @@
-; pcboot MBR.
+; pcboot master boot record (MBR)
 ;
 ; Searches the boot disk for the pcboot boot volume and launches it via the
 ; conventional MBR-VBR interface.
 ;
-; The MBR only searches the disk indicated by the DL value.  Other disks could
-; conceivably be insecure (e.g. a USB flash drive).
+; The MBR only searches the disk indicated by the DL value, and only if DL is
+; between 0x80 and 0x8f.  It otherwise searches the disk 0x80.  Searching other
+; disks might(?) be insecure (e.g. an unexpectedly bootable USB flash drive?).
 ;
-; The VBR is identified by the string "PCBOOT" followed by 0xAA55 at the end of
-; the VBR.  The MBR searches all partitions, and succeeds if only a single VBR
-; is found.  If multiple VBRs match, the MBR aborts.
+; The VBR is identified by an 18-byte marker at the end of the VBR.  The MBR
+; searches for the marker in all primary and logical partitions with a FAT32
+; partition type, and succeeds if only a single VBR is found.  If multiple VBRs
+; match, the MBR aborts.
+;
+; pcboot marker:
+;
+;     0 1 2 3 4 5  6  7 8 9  10   11   12   13   14   15   16   17
+;     p c b o o t ' ' e r r 0x00 0x00 0x8f 0x70 0x92 0x77 0x55 0xAA
+;                                     ^^^^^^^^^^^^^^^^^^^
+;     These 4 bytes are configurable ----/
 ;
 ; To avoid a hypothetical(?) DOS vulnerability, the MBR only considers
 ; partitions whose type ID is one of the expected values for a FAT32 volume.
@@ -16,6 +25,25 @@
 ; create a partition that looked like the boot volume.)  If this risk could be
 ; ruled out somehow, it could reduce the amount of code here.
 ;
+; The pcboot MBR and VBR read sectors using the function "read_sector".  This
+; function checks for INT13 LBA extensions and uses them if present.  If they
+; are not present, it converts an LBA to CHS using INT13H/08H, then passes the
+; CHS to INT13H/02H.  It does not assume that the CHS values in the partition
+; table are accurate.[1]  Using the partition table's CHS values is also tricky
+; when the VBR needs to read the post-VBR sectors--it wants to increment the
+; sector, but it could wrap!  It could issue a multi-sector read, but reads
+; that span tracks might be unreliable.
+;
+; [1] The CHS interface does not describe true disk geometry, but what we
+; actually need is *consistency*.  Because BIOS cannot report the "true"
+; disk geometry provided via ATA, due to field size mismatches, it must emulate
+; a different geometry, and the emulation apparently varies by BIOS vendor and
+; setting.  Partitioning software might not know what the current BIOS-reported
+; geometry is.  Disks can move between computers.  Hence, any CHS values
+; written on disk are not trustworthy.
+;
+
+
 ; TODO:
 ;  - Improve the MBR-VBR interface.  Review the Wikipedia MBR page for details.
 ;     - Consider passing through DH and DS:DI for some kind of "PnP" data.
