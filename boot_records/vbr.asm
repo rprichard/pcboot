@@ -46,11 +46,6 @@ no_match_yet_read_error_flag: equ no_match_yet_read_error_flag_storage - bp_addr
 %include "shared_macros.asm"
 
 
-%macro set_di_to_sector_buffer_and_cx_to_512_and_cld 0
-        call func_set_di_to_sector_buffer_and_cx_to_512_and_cld
-%endmacro
-
-
         section .boot_record
 
         global main
@@ -157,7 +152,9 @@ scan_pcboot_vbr_partition:
         ; Check whether the VBR matches our own VBR.  Don't trash esi.
         pusha
         mov si, vbr
-        set_di_to_sector_buffer_and_cx_to_512_and_cld
+        mov di, sector_buffer
+        mov cx, 512
+        cld
         rep cmpsb
         popa
 
@@ -182,16 +179,6 @@ scan_pcboot_vbr_partition:
 
 
 
-        ;
-        ; Code size optimization.  With three callers, it ultimate saves one
-        ; byte versus inlining these instructions.  Only two of the three
-        ; callers want cx set to 512.
-        ;
-func_set_di_to_sector_buffer_and_cx_to_512_and_cld:
-        mov di, sector_buffer
-        mov cx, 512
-        cld
-        ret
 
 
 

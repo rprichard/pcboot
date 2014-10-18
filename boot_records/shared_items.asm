@@ -271,7 +271,9 @@ clear_sector_buffer:
         ; our sector isn't addressable using CHS, then instead of aborting, we
         ; "succeed" and pretend the sector was empty.  We don't want to abort
         ; on an unreachable partition when the pcboot VBR *is* CHS-addressable.
-        set_di_to_sector_buffer_and_cx_to_512_and_cld
+        mov di, sector_buffer
+        mov cx, 512
+        cld
         xor al, al
         rep stosb
         ret
