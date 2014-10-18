@@ -85,7 +85,13 @@ fail:
 read_sector:
         pushad
 
-        call clear_sector_buffer
+        ;
+        ; The sector we read is either a pcboot VBR candidate or an EBR.  In
+        ; either case, the sector must end with 0xaa55 to be a valid candidate.
+        ; Ensure that we do not accept the sector by clearing the last two
+        ; bytes.
+        ;
+        mov [sector_buffer + 512 - 2], ds
 
         ; Check for INT13 extensions.  According to RBIL, INT13/41h modifies
         ; AX, BX, CX, DH, and the CF flag.  According to a GRUB2 comment, it
@@ -112,9 +118,7 @@ read_sector:
         mov si, sp
         int 0x13                        ; Live GPRs: BP, SP
         add sp, 16
-        jnc short read_sector_chs_fallback.done
-        call handle_read_error
-        jmp short read_sector_chs_fallback.done
+        jmp short read_sector_chs_fallback.read_finished
 
 
         ;
@@ -128,17 +132,17 @@ read_sector:
         ; Second half of the read_sector function.
         ;
 read_sector_chs_fallback:
-        push word geometry_error        ; Push error code.
-
         ; Get CHS geometry.  According to RBIL, INT13/08h modifies AX, BL, CX,
         ; DX, DI, and the CF flag.
         mov ah, 8
         mov dl, [bp + disk_number]
         xor di, di
         int 0x13                        ; Live GPRs: ESI, BP, SP
+        push word geometry_error        ; Push error code.
         jc short fail
         test ah, ah
         jnz short fail
+        pop di                          ; Pop error code.
 
         ; INT13/08h returns the geometry in these variables:
         ;  - CH == Cm & 0xFF
@@ -184,7 +188,7 @@ read_sector_chs_fallback:
         ; sector is beyond the maximum cylinder, skip the read (and return a
         ; buffer of all zeros.)
         cmp eax, 1023
-        ja short .done
+        ja short .read_error
 
         ; ax == Ci
 
@@ -197,12 +201,31 @@ read_sector_chs_fallback:
         mov bx, sector_buffer
         mov ax, 0x0201
         int 0x13                        ; Live GPRs: BP, SP
-        jnc short .success
-        call handle_read_error
-.success:
+.read_finished:
+        jnc .return
+.read_error:
+        ;
+        ; Clear the end of the sector buffer and continue.  When we're scanning
+        ; the partition table, we might experience errors because:
+        ;
+        ;  - the cylinder is greater than 1023 in CHS mode
+        ;  - the partition table is corrupt
+        ;
+        ; In those cases, we might prefer to continue booting as long as the
+        ; pcboot volume is accessible.  We want to record the disk error,
+        ; though, so that if we aren't able to boot, we print a different error
+        ; code.
+        ;
+        mov byte [bp + read_error_flag], 1
 
-        pop ax                          ; Pop error code.
-.done:
+        ;
+        ; Clear the high two bytes again to be sure.  In theory, this guards
+        ; against INT13 returning error and somehow putting the right mark into
+        ; the sector buffer.  I'm skeptical that this is necessary, but I don't
+        ; know.
+        ;
+        mov [sector_buffer + 512 - 2], ds
+.return:
         popad
         ret
 
@@ -259,21 +282,4 @@ scan_extended_partition:
 
 .done:
         popa
-        ret
-
-
-
-
-handle_read_error:
-        mov byte [bp + read_error_flag], 1
-clear_sector_buffer:
-        ; Clear the sector buffer.  If the machine lacks INT13 extensions, and
-        ; our sector isn't addressable using CHS, then instead of aborting, we
-        ; "succeed" and pretend the sector was empty.  We don't want to abort
-        ; on an unreachable partition when the pcboot VBR *is* CHS-addressable.
-        mov di, sector_buffer
-        mov cx, 512
-        cld
-        xor al, al
-        rep stosb
         ret
