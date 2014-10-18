@@ -17,11 +17,6 @@
 ; ruled out somehow, it could reduce the amount of code here.
 ;
 ; TODO:
-;  - Improved error checking, such as:
-;     - Protecting against infinite loops in the logical partition scanning.
-;     - Call the BIOS routine to check for INT13 extensions
-;     - If we don't have INT13 extensions, we should avoid scanning partitions
-;       past the CHS limit, maybe?
 ;  - Improve the MBR-VBR interface.  Review the Wikipedia MBR page for details.
 ;     - Consider passing through DH and DS:DI for some kind of "PnP" data.
 ;     - Consider whether interrupts should be on or off.
