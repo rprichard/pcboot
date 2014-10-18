@@ -185,10 +185,6 @@ scan_pcboot_vbr_partition:
 
 
 
-
-
-
-
         times 512-6-6-4-2-($-main) db 0
 
 ; Save code space by combining the pcboot marker and error message.
