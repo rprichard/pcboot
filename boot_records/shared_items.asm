@@ -24,6 +24,7 @@ error_bias:                     equ 16
 disk_read_error:                equ error_bias + 0
 duplicate_vbr_error:            equ error_bias + 1
 missing_vbr_error:              equ error_bias + 2
+missing_post_vbr_marker_error:  equ error_bias + 3
 
 dap_size:                       equ 16
 

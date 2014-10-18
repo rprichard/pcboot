@@ -100,7 +100,7 @@ main:
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
         push word missing_vbr_error     ; Push error code. (No return.)
-        jne short fail
+        jne near fail
 
         ;
         ; Load the next boot sector.
@@ -108,7 +108,21 @@ main:
         mov esi, [bp + match_lba]
         inc esi
         call read_sector
-        jmp sector_buffer
+
+        ;
+        ; Verify that the next sector begins with the pcboot marker.
+        ;
+        ; Perhaps a partitioning tool could fail to preserve the reserved
+        ; area's contents.
+        ;
+        mov si, pcboot_marker
+        mov di, sector_buffer
+        mov cx, pcboot_marker_end - pcboot_marker
+        cld
+        rep cmpsb
+        push word missing_post_vbr_marker_error         ; Push error code. (No return.)
+        jne short fail
+        jmp sector_buffer + (stage1_load_loop_entry - stage1_load_loop_marker)
 
 
 
@@ -168,10 +182,12 @@ scan_pcboot_vbr_partition:
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
         db 0, '5' - error_bias, "rre "
+pcboot_marker:
         db "toobcp"                     ; Marker text and error text
 pcboot_error_end:
         db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
         dw 0xaa55
+pcboot_marker_end:
 
 
 
@@ -202,6 +218,12 @@ match_lba_storage:              dd 0
 ;
 
         times (stage1_load_loop-vbr)-($-main) db 0
+
+stage1_load_loop_marker:
+        ; Duplicate the marker at the start of the stage1 prep area.
+        db "toobcp"
+        db 0x8f, 0x70, 0x92, 0x77
+        dw 0xaa55
 
 stage1_load_loop_entry:
         mov di, stage1_load_loop
@@ -240,4 +262,4 @@ stage1_load_loop_entry:
         mov esi, [bp + match_lba]
         jmp stage1
 
-        times 512-($-stage1_load_loop_entry) db 0
+        times 512-($-stage1_load_loop_marker) db 0
