@@ -40,6 +40,7 @@ disk_number:            equ disk_number_storage         - bp_address
 no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
 read_error_flag:        equ read_error_flag_storage     - bp_address
+no_match_yet_read_error_flag: equ no_match_yet_read_error_flag_storage - bp_address
 
 
 %include "shared_macros.asm"
@@ -80,8 +81,9 @@ main:
         mov bp, bp_address
 
         ; Initialize globals.
-        mov byte [bp + no_match_yet], 1
-        mov byte [bp + read_error_flag], 0
+        ;  - set no_match_yet to 1.
+        ;  - set read_error_flag to 0.
+        mov word [bp + no_match_yet_read_error_flag], 1
 
         init_disk_number_dynamic
 
@@ -222,10 +224,13 @@ pcboot_marker_end:
 
         bp_address:
 
-disk_number_storage:            db 0
+no_match_yet_read_error_flag_storage:
 no_match_yet_storage:           db 0
-match_lba_storage:              dd 0
 read_error_flag_storage:        db 0
+no_match_yet_read_error_flag_storage_end:
+
+disk_number_storage:            db 0
+match_lba_storage:              dd 0
 
 
 
