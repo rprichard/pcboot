@@ -102,13 +102,18 @@ read_sector:
         ;
         mov [sector_buffer + 512 - 2], ds
 
+        ; Save the input LBA to the read_sector_lba global.  If we trusted BIOS
+        ; INT13H/41H and INT13H/08H to preserve ESI, then we could save a few
+        ; bytes of code here.
+        mov dword [bp + read_sector_lba], esi
+
         ; Check for INT13 extensions.  According to RBIL, INT13/41h modifies
         ; AX, BX, CX, DH, and the CF flag.  According to a GRUB2 comment, it
         ; also trashes DL on some BIOS versions, such as "AST BIOS 1.04".
         mov ah, 0x41
         mov bx, 0x55aa
         mov dl, [bp + disk_number]
-        int 0x13                        ; Live GPRs: ESI, BP, SP
+        int 0x13                        ; Live GPRs: BP, SP
         jc short read_sector_chs_fallback
         cmp bx, 0xaa55
         jne short read_sector_chs_fallback
@@ -117,7 +122,7 @@ read_sector:
         ; packet) onto the stack and pass it to BIOS.
         push ds                         ; Reserved (0)
         push ds                         ; High 16 bits of sector index (0)
-        push esi                        ; Low 32 bits of sector index
+        push dword [bp + read_sector_lba] ; Low 32 bits of sector index
         push ds                         ; Read buffer: segment 0
         push word sector_buffer         ; Read buffer: address
         push word 1                     ; Number of sectors to read: 1
@@ -146,7 +151,7 @@ read_sector_chs_fallback:
         mov ah, 8
         mov dl, [bp + disk_number]
         xor di, di
-        int 0x13                        ; Live GPRs: ESI, BP, SP
+        int 0x13                        ; Live GPRs: BP, SP
         push word geometry_error        ; Push error code.
         jc short fail
         test ah, ah
@@ -165,11 +170,11 @@ read_sector_chs_fallback:
 
         push dx
 
-        ; esi == LBA == (((Ci * Hc) + Hi) * Sc) + (Si - 1)
+        ; [bp + read_sector_lba] == LBA == (((Ci * Hc) + Hi) * Sc) + (Si - 1)
 
         ; Divide LBA by Sc.
         xor edx, edx
-        mov eax, esi
+        mov eax, [bp + read_sector_lba]
         and ecx, 0x3f
         div ecx
 

@@ -54,6 +54,7 @@ disk_number:            equ disk_number_storage         - bp_address
 no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
 read_error_flag:        equ read_error_flag_storage     - bp_address
+read_sector_lba:        equ read_sector_lba_storage     - bp_address
 error_char:             equ '0'
 
 
@@ -226,4 +227,5 @@ bp_address:
 ; data in a non-bss section.
 ;
 
-match_lba_storage:      dd 0
+match_lba_storage:              dd 0
+read_sector_lba_storage:        dd 0

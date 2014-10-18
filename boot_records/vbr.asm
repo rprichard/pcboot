@@ -45,6 +45,7 @@ no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
 read_error_flag:        equ read_error_flag_storage     - bp_address
 no_match_yet_read_error_flag: equ no_match_yet_read_error_flag_storage - bp_address
+read_sector_lba:        equ read_sector_lba_storage     - bp_address
 error_char:             equ 'A'
 
 
@@ -91,10 +92,8 @@ main:
         xor esi, esi
         call read_sector
         jc short .skip_primary_scan_loop
-        mov si, sector_buffer
+        call set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld
         mov di, mbr
-        mov cx, 512
-        cld
         rep movsb
 
         mov bx, mbr + 446
@@ -158,10 +157,7 @@ scan_pcboot_vbr_partition:
 
         ; Check whether the VBR matches our own VBR.  Don't trash esi.
         pusha
-        mov si, vbr
-        mov di, sector_buffer
-        mov cx, 512
-        cld
+        call set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld
         rep cmpsb
         popa
 
@@ -183,6 +179,19 @@ scan_pcboot_vbr_partition:
 
 %include "shared_items.asm"
 
+
+
+
+        ;
+        ; This code factoring does not affect code size directly, but it does
+        ; keep failure jumps smaller.
+        ;
+set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld:
+        mov si, sector_buffer
+        mov di, vbr
+        mov cx, 512
+        cld
+        ret
 
 
 
@@ -214,9 +223,10 @@ no_match_yet_storage:           db 0
 read_error_flag_storage:        db 0
 no_match_yet_read_error_flag_storage_end:
 
-disk_number_storage:            db 0
+        align 4
 match_lba_storage:              dd 0
-
+read_sector_lba_storage:        dd 0
+disk_number_storage:            db 0
 
 
 
