@@ -31,6 +31,7 @@ geometry_error:                 equ error_bias + 0
 duplicate_vbr_error:            equ error_bias + 2
 missing_vbr_error:              equ error_bias + 4
 missing_post_vbr_marker_error:  equ error_bias + 6
+read_error:                     equ error_bias + 8
 
 dap_size:                       equ 16
 
@@ -81,6 +82,7 @@ fail:
         ; large for the disk.
         ;
         ; Inputs: esi: the LBA of the sector to read.
+        ; Outputs: CF is set on error and clear on success.
         ; Trashes: none
 read_sector:
         pushad
@@ -118,7 +120,7 @@ read_sector:
         mov si, sp
         int 0x13                        ; Live GPRs: BP, SP
         add sp, 16
-        jmp short read_sector_chs_fallback.read_finished
+        jmp short read_sector_chs_fallback.int13_read_finished
 
 
         ;
@@ -188,7 +190,7 @@ read_sector_chs_fallback:
         ; sector is beyond the maximum cylinder, skip the read (and return a
         ; buffer of all zeros.)
         cmp eax, 1023
-        ja short .read_error
+        ja short .read_call_failed
 
         ; ax == Ci
 
@@ -201,9 +203,9 @@ read_sector_chs_fallback:
         mov bx, sector_buffer
         mov ax, 0x0201
         int 0x13                        ; Live GPRs: BP, SP
-.read_finished:
+.int13_read_finished:
         jnc .return
-.read_error:
+.read_call_failed:
         ;
         ; Clear the end of the sector buffer and continue.  When we're scanning
         ; the partition table, we might experience errors because:
@@ -225,6 +227,12 @@ read_sector_chs_fallback:
         ; know.
         ;
         mov [sector_buffer + 512 - 2], ds
+
+        ;
+        ; Set the carry flag.  This is necessary when the CHS-mode cylinder is
+        ; too large.
+        ;
+        stc
 .return:
         popad
         ret
@@ -275,6 +283,7 @@ scan_extended_partition:
         ; Advance to the next EBR.  We must reread the EBR because it was
         ; trashed while scanning for a VBR.
         call read_sector
+        jc short .done                  ; Guard against a flaky disk.
         mov bx, sector_buffer + 512 - 2 - 64 + 16
         mov esi, edx
         add esi, [bx + 8]

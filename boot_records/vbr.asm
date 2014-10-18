@@ -85,6 +85,7 @@ main:
         ; Load the MBR and copy it out of the way.
         xor esi, esi
         call read_sector
+        jc short .skip_primary_scan_loop
         mov si, sector_buffer
         mov di, mbr
         mov cx, 512
@@ -101,10 +102,11 @@ main:
         cmp bx, mbr + 510
         jne short .primary_scan_loop
 
+.skip_primary_scan_loop:
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
         push word missing_vbr_error     ; Push error code. (No return.)
-        jne near fail
+        jne short fail
 
         ;
         ; Load the next boot sector.
@@ -114,15 +116,15 @@ main:
         call read_sector
 
         ;
-        ; Verify that the next sector begins with a marker.
+        ; Verify that the next sector ends with a marker.
         ;
         ; Perhaps a partitioning tool could fail to preserve the reserved
         ; area's contents.
         ;
         push word missing_post_vbr_marker_error         ; Push error code. (No return.)
-        cmp dword [sector_buffer], 0xaa55aa55
+        cmp dword [sector_buffer + 512 - 4], 0xaa55aa55
         jne short fail
-        jmp sector_buffer + (stage1_load_loop_entry - stage1_load_loop_marker)
+        jmp sector_buffer
 
 
 
@@ -229,12 +231,6 @@ match_lba_storage:              dd 0
 
         times (stage1_load_loop-vbr)-($-main) db 0
 
-stage1_load_loop_marker:
-        ; In FAT32, if the reserved area disappeared somehow, this 32-bit value
-        ; would be the cluster 0x0a55aa55 with two of the reserved highest bits
-        ; set.  It is somewhat unlikely to appear by accident.
-        dd 0xaa55aa55
-
 stage1_load_loop_entry:
         mov di, stage1_load_loop
         mov si, sector_buffer
@@ -247,6 +243,7 @@ stage1_load_loop_entry:
         ;
         ; Load the next 30 sectors of the volume to 0x9000.
         ;
+        push word read_error            ; Push error code. (No return.)
         mov ebx, [bp + match_lba]
         add ebx, 2
         mov di, stage1
@@ -254,6 +251,7 @@ stage1_load_loop_entry:
 .read_loop:
         mov esi, ebx
         call read_sector
+        jc near fail
         mov cx, 512
         mov si, sector_buffer
         cld
@@ -272,4 +270,12 @@ stage1_load_loop_entry:
         mov esi, [bp + match_lba]
         jmp stage1
 
-        times 512-($-stage1_load_loop_marker) db 0
+        ;
+        ; pcboot post-VBR sector marker
+        ;
+        ; In FAT32, if the reserved area disappeared somehow, this 32-bit value
+        ; would be the cluster 0x0a55aa55 with two of the reserved highest bits
+        ; set.  It is somewhat unlikely to appear by accident.
+        ;
+        times 508-($-stage1_load_loop_entry) db 0
+        dd 0xaa55aa55

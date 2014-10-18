@@ -115,6 +115,8 @@ main:
         ;
         mov esi, [bp + match_lba]
         call read_sector
+        push word read_error            ; Push error code. (No return.)
+        jc short fail
         xor si, si
         mov dl, [bp + disk_number]
         jmp sector_buffer
