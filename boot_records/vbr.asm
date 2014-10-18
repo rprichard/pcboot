@@ -119,16 +119,13 @@ main:
         call read_sector
 
         ;
-        ; Verify that the next sector begins with the pcboot marker.
+        ; Verify that the next sector begins with a marker.
         ;
         ; Perhaps a partitioning tool could fail to preserve the reserved
         ; area's contents.
         ;
-        set_di_to_sector_buffer_and_cx_to_512_and_cld
-        mov si, pcboot_marker
-        mov cx, pcboot_marker_end - pcboot_marker
-        rep cmpsb
         push word missing_post_vbr_marker_error         ; Push error code. (No return.)
+        cmp dword [sector_buffer], 0xaa55aa55
         jne short fail
         jmp sector_buffer + (stage1_load_loop_entry - stage1_load_loop_marker)
 
@@ -246,10 +243,10 @@ match_lba_storage:              dd 0
         times (stage1_load_loop-vbr)-($-main) db 0
 
 stage1_load_loop_marker:
-        ; Duplicate the marker at the start of the stage1 prep area.
-        db "toobcp"
-        db 0x8f, 0x70, 0x92, 0x77
-        dw 0xaa55
+        ; In FAT32, if the reserved area disappeared somehow, this 32-bit value
+        ; would be the cluster 0x0a55aa55 with two of the reserved highest bits
+        ; set.  It is somewhat unlikely to appear by accident.
+        dd 0xaa55aa55
 
 stage1_load_loop_entry:
         mov di, stage1_load_loop
