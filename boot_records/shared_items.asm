@@ -234,6 +234,15 @@ read_sector_chs_fallback:
         ; Set the carry flag.  This is necessary when the CHS-mode cylinder is
         ; too large.
         ;
+        ; OPT-SIZE: This 1-byte "stc" instruction is arguably unnecessary in
+        ; the VBR.  It is only needed to ensure that CF is set when the
+        ; CHS-mode cylinder index is too large, which in the VBR, can only
+        ; happen when reloading an EBR.  We already loaded the EBR once, so we
+        ; know the cylinder is small enough, assuming INT13 returns consistent
+        ; geometry over time.  It is complicated.  If this instruction were
+        ; removed, the post-VBR sector would compensate by including its own
+        ; copy of read_sector (and also checksumming stage1).
+        ;
         stc
 .return:
         popad
