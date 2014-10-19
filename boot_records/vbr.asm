@@ -122,6 +122,7 @@ main:
         ;
 
         jmp short .skip_fat32_params
+        nop
         times 90-($-main) db 0
 .skip_fat32_params:
         xor ax, ax
