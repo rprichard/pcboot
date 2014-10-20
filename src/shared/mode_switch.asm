@@ -6,8 +6,10 @@ extern _tls_size
 
 
         ;
-        ; Define the GDT for protected mode.  There are four segments:
+        ; Define the GDT for protected mode.  There are five segments:
         ;  - Code and data segments exposing the entire 4GB address space.
+        ;  - A small "TLS" segment loaded into the gs register and used to
+        ;    implement stack overflow checking.
         ;  - Code and data segments with a 16-bit limit, used to transition
         ;    back to real mode.
         ;

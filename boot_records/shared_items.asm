@@ -4,6 +4,12 @@
 ;
 ;  - byte [bp + disk_number] must be the BIOS boot disk number.
 ;
+;  - byte [bp + read_error_flag] must be initialized to zero at startup (or
+;    statically).
+;
+;  - dword [bp + read_sector_lba] must exist.  It does not need to be
+;    initialized.
+;
 ;  - sector_buffer must be an integral assembler constant referring to a 512
 ;    byte buffer to read sectors into.
 ;
@@ -46,11 +52,14 @@ maximum_logical_partitions:     equ 127
 
 %macro define_fail_routine 0
         ;
-        ; Print an error and hang.  pcboot_error should be in reverse order.
+        ; Print an error and hang.
         ;
         ; Bootloader code commonly assumes that INT 10h/0Eh will not trash SI,
         ; so that assumption is safe.  For example, FreeBSD's boot0.S and GRUB2
         ; make this assumption.
+        ;
+        ; Inputs: the top of the stack has an error code
+        ;         (NOT a return address, i.e. "call fail" is incorrect)
         ;
 fail:
         mov si, pcboot_error
@@ -76,29 +85,37 @@ fail:
 
         ;
         ; Reads a sector to the 512-byte buffer at the "sector_buffer" address
-        ; constant.  Tries to do an LBA write first, but if extensions aren't
-        ; supported, the routine falls back to a CHS write.
+        ; constant.  Tries to do an LBA read first, but if extensions aren't
+        ; supported, the routine falls back to a CHS read.
         ;
-        ; If a write fails, the routine aborts.
+        ; If we attempt to do a CHS read, but the LBA is too large, then the
+        ; routine returns a sector buffer that does not end in 0xaa55, and the
+        ; CF flag is set.
         ;
-        ; If the LBA is out-of-bounds for a CHS access, the routine returns
-        ; after filling the sector buffer with zeros.
+        ; If the INT13 read call fails, the routine again returns a sector
+        ; buffer that does not end in 0xaa55 and sets the CF flag.  It also
+        ; sets [bp + read_error_flag], which later affects the error code if
+        ; the boot ultimately fails.
         ;
-        ; No checking is done to verify that the LBA or cylinder number is too
-        ; large for the disk.
+        ; If the read succeeds, the CF flag is clear on return.
+        ;
+        ; No checking is done to verify that the LBA or the cylinder number is
+        ; within the disk's capacity.
         ;
         ; Inputs: esi: the LBA of the sector to read.
         ; Outputs: CF is set on error and clear on success.
+        ;          sector_buffer is filled.  Its last two bytes are zero on
+        ;              failure.
         ; Trashes: none
         ;
 read_sector:
         pushad
 
         ;
-        ; The sector we read is either a pcboot VBR candidate or an EBR.  In
-        ; either case, the sector must end with 0xaa55 to be a valid candidate.
-        ; Ensure that we do not accept the sector by clearing the last two
-        ; bytes.
+        ; When we read a VBR candidate, the post-VBR sector, or an EBR, we only
+        ; accept the sector if it ends with a 0xaa55 marker.  By ensuring that
+        ; the marker is cleared on a failed read, we can omit a CF test at
+        ; those read_sector call sites.
         ;
         mov [sector_buffer + 512 - 2], ds
 
@@ -199,8 +216,8 @@ read_sector_chs_fallback:
         pop cx                          ; [*] Set CL to Si.
 
         ; Ci can exceed 0xffff, so we must use a 32-bit compare.  If the
-        ; sector is beyond the maximum cylinder, skip the read (and return a
-        ; buffer of all zeros.)
+        ; sector is beyond the maximum cylinder, skip the read and return
+        ; failure.
         cmp eax, 1023
         ja short .read_call_failed
 

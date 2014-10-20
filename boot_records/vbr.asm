@@ -118,7 +118,7 @@ main:
         ;
         ;  * The CS register is not initialized.  It's possible that this code
         ;    is running at 0x7c0:0 rather than 0:0x7c00.  The VBR can only use
-        ;    relative jumps.
+        ;    relative jumps and calls.
         ;
 
         jmp short .skip_fat32_params
