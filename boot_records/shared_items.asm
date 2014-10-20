@@ -20,7 +20,9 @@
 ;  - Each int instruction has a comment documenting the general-purpose
 ;    registers required to be preserved (i.e. Live GPRs).
 ;
-;  - BIOS calls are not relied upon to preserve the Direction Flag.
+;  - BIOS calls are not relied upon to preserve the Direction Flag.  When this
+;    code calls into BIOS, the Direction Flag is either cleared or has the same
+;    value as when BIOS last returned.
 ;
 ;  - Ralph Brown's Interrupt List (RBIL) tries to document which registers each
 ;    interrupt function changes.
