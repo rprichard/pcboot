@@ -208,15 +208,17 @@ scan_pcboot_vbr_partition:
 
 
 ;
-; Initialized data
+; Statically-initialized data area.
+;
+; The variables need to be within 128 bytes of bp_address.
 ;
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
 pcboot_vbr_marker:
-        db "pcboot err"
+        db "pcboot err"                 ; Error text and part of marker
 pcboot_error_char:
-        db 0, 0           ; Marker and error text
+        db 0, 0                         ; Error code and NUL terminator
         db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
         dw 0xaa55                       ; PC bootable sector marker
 pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)

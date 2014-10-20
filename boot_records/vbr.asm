@@ -248,15 +248,16 @@ set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld:
 
 
 
-        times 512-6-6-4-2-($-main) db 0
+
+        times 512 - (10 + 2 + 4 + 2) - ($ - main) db 0
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
-        db "pcboot err"
+        db "pcboot err"                 ; Error text and part of marker
 pcboot_error_char:
-        db 0, 0           ; Marker and error text
+        db 0, 0                         ; Error code and NUL terminator
         db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
-        dw 0xaa55
+        dw 0xaa55                       ; PC bootable sector marker
 
 
 
