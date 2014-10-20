@@ -4,6 +4,8 @@
 ;
 ;  - byte [bp + disk_number] must be the BIOS boot disk number.
 ;
+;  - dword [bp + match_lba] must exist.  It does not need to be initialized.
+;
 ;  - byte [bp + read_error_flag] must be initialized to zero at startup (or
 ;    statically).
 ;
@@ -79,6 +81,54 @@ fail:
         hlt
         jmp short .done
 %endmacro
+
+
+
+
+        ;
+        ; Examine a single partition to see whether it is a matching pcboot
+        ; VBR.  If it is one, update the global state (and potentially halt).
+        ;
+        ; Inputs: bx points to a partition entry
+        ;         esi is a value to add to the entry's LBA
+        ;
+        ; Trashes: sector_buffer
+        ;
+scan_pcboot_vbr_partition:
+        pushad
+        ; Check the partition type.  Allowed types: 0x0b, 0x0c, 0x1b, 0x1c.
+        mov al, [bx + 4]
+        sub al, 0x0b            ; (Now looking for: 0x00, 0x01, 0x10, 0x11.)
+        and al, 0xee
+        jnz short .done
+
+        ; Look for the pcboot marker at the end of the VBR.
+        add esi, [bx + 8]
+        call read_sector
+
+        ; Test whether the sector we just read has the pcboot marker.  Set the
+        ; ZF flag but otherwise leave registers alone.  (In particular, leave
+        ; esi alone.)
+        pusha
+        mov si, sector_buffer + 512 - pcboot_vbr_marker_size
+        mov di, pcboot_vbr_marker
+        mov cx, pcboot_vbr_marker_size
+        cld
+        repe cmpsb
+        popa
+
+        jne short .done
+
+        ; We found a match!  Abort if this is the second match.
+        dec byte [bp + no_match_yet]
+        push word duplicate_vbr_error   ; Push error code.
+        jnz short fail
+        pop ax                          ; Pop error code.
+        mov [bp + match_lba], esi
+
+.done:
+        popad
+        ret
 
 
 
