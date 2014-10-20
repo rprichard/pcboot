@@ -104,10 +104,10 @@ main:
         ;    Hence, this code avoids clearing interrupts.  (Saves one byte.)
         ;
         xor ax, ax
-        mov ds, ax                      ; Clear DS
-        mov es, ax                      ; Clear ES
         mov ss, ax                      ; Clear SS
         mov sp, stack                   ; Set SP to 0x7c00
+        mov ds, ax                      ; Clear DS
+        mov es, ax                      ; Clear ES
         static_assert_eq stack, original_location
         mov si, sp
         mov di, main

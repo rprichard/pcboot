@@ -126,10 +126,10 @@ main:
         times 90-($-main) db 0
 .skip_fat32_params:
         xor ax, ax
-        mov ds, ax                      ; Clear DS
-        mov es, ax                      ; Clear ES
         mov ss, ax
         mov sp, stack
+        mov ds, ax                      ; Clear DS
+        mov es, ax                      ; Clear ES
         sti
 
         ; Use BP to access global variables with smaller memory operands.
