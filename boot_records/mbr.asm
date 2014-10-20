@@ -167,10 +167,9 @@ scan_pcboot_vbr_partition:
         pushad
         ; Check the partition type.  Allowed types: 0x0b, 0x0c, 0x1b, 0x1c.
         mov al, [bx + 4]
-        and al, 0xef
-        sub al, 0x0b
-        cmp al, 1
-        ja short .done
+        sub al, 0x0b            ; (Now looking for: 0x00, 0x01, 0x10, 0x11.)
+        and al, 0xee
+        jnz short .done
 
         ; Look for the pcboot marker at the end of the VBR.
         add esi, [bx + 8]
