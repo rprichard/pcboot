@@ -6,9 +6,9 @@
 ; The VBR follows the same interface as other VBRs--it does not assume it was
 ; invoked from the pcboot MBR.  As far I know, there is no reliable way in the
 ; VBR to get the VBR's LBA from the MBR.[1][2]  To find the boot volume, the
-; VBR scans the disk's partitions, just like the MBR.  Instead of looking for a
-; marker, though, it looks for VBRs that exactly match the VBR loaded at
-; 0x7c00.  Like the MBR, it succeeds only if a single match exists.
+; VBR scans the disk's partitions, just like the MBR.  Like the MBR, it looks
+; for a VBR with the appropriate marker, and succeeds only if a single match
+; exists.
 ;
 ; Once it has found a match, it loads the post-VBR sector and jumps to it.
 ; The post-VBR sector loads stage1 from the remaining 15KiB of the FAT32
@@ -66,7 +66,7 @@
 ;   0x600..0x7ff                MBR
 ;   ...
 ;   0x????..0x7bff              stack
-;   0x7c00..0x7dff              pristine, executing VBR
+;   0x7c00..0x7dff              executing VBR
 ;   0x7e00..0x7fff              uninitialized variables
 ;   0x8000..0x81ff              sector read buffer
 ;   0x8200..0x83ff              relocated stage1 load-loop
@@ -97,7 +97,6 @@ disk_number:            equ disk_number_storage         - bp_address
 no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
 read_error_flag:        equ read_error_flag_storage     - bp_address
-no_match_yet_read_error_flag: equ no_match_yet_read_error_flag_storage - bp_address
 read_sector_lba:        equ read_sector_lba_storage     - bp_address
 error_char:             equ 'A'
 
@@ -135,19 +134,16 @@ main:
         ; Use BP to access global variables with smaller memory operands.
         mov bp, bp_address
 
-        ; Initialize globals.
-        ;  - set no_match_yet to 1.
-        ;  - set read_error_flag to 0.
-        mov word [bp + no_match_yet_read_error_flag], 1
-
-        init_disk_number_dynamic
+        init_disk_number
 
         ; Load the MBR and copy it out of the way.
         xor esi, esi
         call read_sector
         jc short .skip_primary_scan_loop
-        call set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld
+        mov si, sector_buffer
         mov di, mbr
+        mov cx, 512
+        cld
         rep movsb
 
         mov bx, mbr + 446
@@ -164,7 +160,7 @@ main:
         ; If we didn't find a match, fail at this point.
         cmp byte [bp + no_match_yet], 0
         push word missing_vbr_error     ; Push error code. (No return.)
-        jne short fail
+        jne near fail
 
         ;
         ; Load the next boot sector.
@@ -210,10 +206,12 @@ scan_pcboot_vbr_partition:
 
         ; Check whether the VBR matches our own VBR.  Don't trash esi.
         pusha
-        call set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld
-        rep cmpsb
+        mov si, sector_buffer + 512 - pcboot_vbr_marker_size
+        mov di, pcboot_vbr_marker
+        mov cx, pcboot_vbr_marker_size
+        cld
+        repe cmpsb
         popa
-
         jne short .done
 
         ; We found a match!  Abort if this is the second match.
@@ -235,16 +233,17 @@ scan_pcboot_vbr_partition:
 
 
 
-        ;
-        ; This code factoring does not affect code size directly, but it does
-        ; keep failure jumps smaller.
-        ;
-set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld:
-        mov si, sector_buffer
-        mov di, vbr
-        mov cx, 512
-        cld
-        ret
+;
+; Statically-initialized data area.
+;
+; The variables need to be within 128 bytes of bp_address.
+;
+
+        no_match_yet_storage:           db 1
+        read_error_flag_storage:        db 0
+        disk_number_storage:            db 0x80
+
+vbr_code_end:
 
 
 
@@ -253,11 +252,13 @@ set_si_to_sector_buffer_and_di_to_vbr_and_cx_to_512_and_cld:
 
 ; Save code space by combining the pcboot marker and error message.
 pcboot_error:
+pcboot_vbr_marker:
         db "pcboot err"                 ; Error text and part of marker
 pcboot_error_char:
         db 0, 0                         ; Error code and NUL terminator
         db 0x8f, 0x70, 0x92, 0x77       ; Default marker ID number
         dw 0xaa55                       ; PC bootable sector marker
+pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)
 
 
 
@@ -272,15 +273,8 @@ pcboot_error_char:
 
         bp_address:
 
-no_match_yet_read_error_flag_storage:
-no_match_yet_storage:           db 0
-read_error_flag_storage:        db 0
-no_match_yet_read_error_flag_storage_end:
-
-        align 4
 match_lba_storage:              dd 0
 read_sector_lba_storage:        dd 0
-disk_number_storage:            db 0
 
 
 
