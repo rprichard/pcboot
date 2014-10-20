@@ -6,9 +6,6 @@
 ;
 ;  - dword [bp + match_lba] must exist.  It does not need to be initialized.
 ;
-;  - byte [bp + read_error_flag] must be initialized to zero at startup (or
-;    statically).
-;
 ;  - dword [bp + read_sector_lba] must exist.  It does not need to be
 ;    initialized.
 ;
@@ -51,6 +48,8 @@ dap_size:                       equ 16
 ;
 maximum_logical_partitions:     equ 127
 
+inc_ax_instruction:             equ 0x40
+
 
 
 
@@ -68,7 +67,10 @@ maximum_logical_partitions:     equ 127
 fail:
         mov si, pcboot_error
         pop ax
-        add al, [bp + read_error_flag]
+.read_error_flag:
+        ; Modified to "inc ax" after a read error.
+        nop
+.read_error_flag_end:
         mov byte [si + pcboot_error_char - pcboot_error], al
 .loop:
         cld
@@ -145,9 +147,10 @@ scan_pcboot_vbr_partition:
         ; CF flag is set.
         ;
         ; If the INT13 read call fails, the routine again returns a sector
-        ; buffer that does not end in 0xaa55 and sets the CF flag.  It also
-        ; sets [bp + read_error_flag], which later affects the error code if
-        ; the boot ultimately fails.
+        ; buffer that does not end in 0xaa55, and sets the CF flag.  It also
+        ; modifies "fail" to print an error code one higher, so that if the
+        ; boot ultimately fails, the user can know that a disk read error
+        ; occurred.
         ;
         ; If the read succeeds, the CF flag is clear on return.
         ;
@@ -295,11 +298,13 @@ read_sector_chs_fallback:
         ;  - the partition table is corrupt
         ;
         ; In those cases, we might prefer to continue booting as long as the
-        ; pcboot volume is accessible.  We want to record the disk error,
-        ; though, so that if we aren't able to boot, we print a different error
-        ; code.
+        ; pcboot volume is accessible.  If the boot ultimately fails, though,
+        ; we'd like some indication that a disk read failed.
         ;
-        mov byte [bp + read_error_flag], 1
+        ; We accomplish this by modifying the fail routine's body.
+        ;
+        static_assert_eq (fail.read_error_flag_end - fail.read_error_flag), 1
+        mov byte [bp + (fail.read_error_flag - bp_address)], inc_ax_instruction
 
         ;
         ; Clear the high two bytes again to be sure.  In theory, this guards
@@ -326,6 +331,15 @@ read_sector_chs_fallback:
 .return:
         popad
         ret
+
+
+
+
+%ifdef define_vbr_bp_address
+        ; In the VBR, set BP lower for the sake of the error handling code
+        ; in read_sector that uses BP to modify the fail routine.
+        bp_address:
+%endif
 
 
 

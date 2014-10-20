@@ -96,7 +96,6 @@ stage1:                         equ 0x9000
 disk_number:            equ disk_number_storage         - bp_address
 no_match_yet:           equ no_match_yet_storage        - bp_address
 match_lba:              equ match_lba_storage           - bp_address
-read_error_flag:        equ read_error_flag_storage     - bp_address
 read_sector_lba:        equ read_sector_lba_storage     - bp_address
 error_char:             equ 'A'
 
@@ -183,6 +182,7 @@ main:
 
 
 
+%define define_vbr_bp_address
 %include "shared_items.asm"
 
 
@@ -195,7 +195,6 @@ main:
 ;
 
         no_match_yet_storage:           db 1
-        read_error_flag_storage:        db 0
         disk_number_storage:            db 0x80
 
 vbr_code_end:
@@ -225,8 +224,8 @@ pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)
 ; using initialized data directives, because nasm insists on having initialized
 ; data in a non-bss section.
 ;
-
-        bp_address:
+; The variables need to be within 128 bytes of bp_address.
+;
 
 match_lba_storage:              dd 0
 read_sector_lba_storage:        dd 0
