@@ -221,13 +221,20 @@ pcboot_error_char:
         dw 0xaa55                       ; PC bootable sector marker
 pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)
 
-mbr_code_end:
-
-        times 437-($-main) db 0
-
 disk_number_storage:            db 0x80
 no_match_yet_storage:           db 0x01
 read_error_flag_storage:        db 0x00
+
+mbr_code_end:
+
+
+
+
+;
+; Disk signature and partition table
+;
+
+        times 440-($-main) db 0
 
 disk_signature:
         dd 0            ; 32-bit disk signature
