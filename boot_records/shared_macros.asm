@@ -34,3 +34,25 @@
 %macro static_assert_eq 2
         times -!!((%1) - (%2)) db 0
 %endmacro
+
+
+        ; Assert that the first operand is <= the second.  (Specifically, it
+        ; asserts that the signed 32-bit value (op2 - op1) is non-negative.)
+%macro static_assert_i32_le 2
+        static_assert_eq (((%2) - (%1)) & 0x8000_0000), 0
+%endmacro
+
+
+        ; Assert that the first operand is < the second.  (Specifically, it
+        ; asserts that the signed 32-bit value (op2 - op1) is positive.)
+%macro static_assert_i32_lt 2
+        static_assert_eq (((%2) - 1 - (%1)) & 0x8000_0000), 0
+%endmacro
+
+
+        ; Given a base address and a target address, assert that the target can
+        ; be reached using a signed 8-bit offset from the base.
+%macro static_assert_in_i8_range 2
+        static_assert_i32_le ((%2) - (%1)), 127
+        static_assert_i32_le ((%1) - (%2)), 128
+%endmacro

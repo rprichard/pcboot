@@ -335,15 +335,6 @@ read_sector_chs_fallback:
 
 
 
-%ifdef define_vbr_bp_address
-        ; In the VBR, set BP lower for the sake of the error handling code
-        ; in read_sector that uses BP to modify the fail routine.
-        bp_address:
-%endif
-
-
-
-
         ; Scan a possible extended partition looking for logical pcboot VBRs.
         ;
         ; Inputs: bx points to a partition entry that might be an EBR.

@@ -107,6 +107,7 @@ error_char:             equ 'A'
 
         global main
 main:
+bp_address:             equ main + 0x200 - 120
         ;
         ; Prologue.  Skip FAT32 boot parameters, setup registers.
         ;
@@ -182,8 +183,12 @@ main:
 
 
 
-%define define_vbr_bp_address
 %include "shared_items.asm"
+
+
+        ; Ensure that the self-modifying code in read_sector uses a single-byte
+        ; memory operand.
+        static_assert_in_i8_range bp_address, fail.read_error_flag
 
 
 
@@ -191,11 +196,11 @@ main:
 ;
 ; Statically-initialized data area.
 ;
-; The variables need to be within 128 bytes of bp_address.
-;
+no_match_yet_storage:           db 1
+disk_number_storage:            db 0x80
 
-        no_match_yet_storage:           db 1
-        disk_number_storage:            db 0x80
+        static_assert_in_i8_range bp_address, no_match_yet_storage
+        static_assert_in_i8_range bp_address, disk_number_storage
 
 vbr_code_end:
 
@@ -224,11 +229,13 @@ pcboot_vbr_marker_size: equ ($ - pcboot_vbr_marker)
 ; using initialized data directives, because nasm insists on having initialized
 ; data in a non-bss section.
 ;
-; The variables need to be within 128 bytes of bp_address.
-;
 
 match_lba_storage:              dd 0
 read_sector_lba_storage:        dd 0
+
+        static_assert_in_i8_range bp_address, match_lba_storage
+        static_assert_in_i8_range bp_address, read_sector_lba_storage
+
 
 
 
