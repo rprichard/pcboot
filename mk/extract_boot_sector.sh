@@ -8,7 +8,7 @@ DEST_SECTOR=$3
 
 ELF_BIN=build/boot_records/$NAME.elf
 TMP_BIN=build/boot_records/$NAME-tmp.bin
-FINAL_BIN=build/$NAME.bin
+FINAL_BIN=build/boot_records/$NAME.bin
 
 objcopy -j.boot_record -Obinary $ELF_BIN $TMP_BIN
 

@@ -14,10 +14,6 @@ mkdir -p test
 dd if=/dev/zero of=test/bootvol bs=1MiB count=63
 mkfs.msdos -F32 -h2048 test/bootvol
 #mcopy -ibootvol /boot/memtest86+.bin ::/MEMTEST.BIN   # reenable later maybe(?)
-dd if=build/vbr.bin of=test/bootvol bs=1 conv=notrunc count=3
-dd if=build/vbr.bin of=test/bootvol bs=1 conv=notrunc count=422 seek=90 skip=90
-dd if=build/vbr.bin of=test/bootvol bs=1 conv=notrunc count=512 seek=512 skip=512
-dd if=build/stage1.bin of=test/bootvol bs=1 conv=notrunc seek=1024
 
 # Create the disk image.
 dd if=/dev/zero of=test/disk bs=1MiB count=64
@@ -45,9 +41,10 @@ EOF
 sfdisk -q --no-reread --force -C64 -H64 -S32 test/disk < test/disk.setup.1
 echo SUCCESS
 
-# Install the MBR and volume into the disk.
-dd if=build/mbr.bin of=test/disk bs=1 count=440 conv=notrunc
-dd if=build/mbr.bin of=test/disk bs=1 count=2 conv=notrunc seek=510 skip=510
+# Install the MBR and volume.
+build/install-pcboot.py --mbr test/disk --volume test/bootvol
+
+# Copy the boot volume into the disk partition.
 dd if=test/bootvol of=test/disk bs=1MiB seek=1 conv=notrunc
 
 # Prepare a VMDK file for VirtualBox.

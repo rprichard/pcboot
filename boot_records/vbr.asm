@@ -84,6 +84,7 @@ stack:                          equ 0x7c00
 sector_buffer:                  equ 0x8000
 stage1_load_loop:               equ 0x8200
 stage1:                         equ 0x9000
+stage1_sector_count:            equ 28
 
 
 ;
@@ -122,6 +123,19 @@ bp_address:             equ main + 0x200 - 120
 
         jmp short .skip_fat32_params
         nop
+
+
+        ;
+        ; Two FAT32 fields that give the location of the FSInfo and backup VBR
+        ; sectors.  These two sectors live (typically? or always?) in the
+        ; reserved area.  We must skip over them when reading (or installing)
+        ; stage1.
+        ;
+        times 48-($-main) db 0
+.fsinfo_sector:         dw 0            ; Relative sector # of FSInfo sector
+.backup_vbr_sector:     dw 0            ; Relative sector # of backup VBR
+
+
         times 90-($-main) db 0
 .skip_fat32_params:
         xor ax, ax
@@ -163,10 +177,20 @@ bp_address:             equ main + 0x200 - 120
         jne near fail
 
         ;
-        ; Load the next boot sector.
+        ; Load the post-VBR boot sector.
         ;
         mov esi, [bp + match_lba]
-        inc esi
+
+        ;
+        ; An "add esi, 0xNN" instruction.  The 0xNN is a one-byte field giving
+        ; the sector index of the post-VBR sector.  It is necessary because the
+        ; reserved area also contains FSInfo and backup-VBR sectors.
+        ;
+        db 0x66, 0x83, 0xc6
+.post_VBR_sector:
+        db 0x7f
+.continue_loading:
+
         call read_sector
 
         ;
@@ -176,7 +200,7 @@ bp_address:             equ main + 0x200 - 120
         ; area's contents.
         ;
         push word missing_post_vbr_marker_error         ; Push error code. (No return.)
-        cmp dword [sector_buffer + 512 - 4], 0xaa55aa55
+        cmp dword [sector_buffer + 512 - 4], post_VBR_sector_marker
         jne short fail
         jmp sector_buffer
 
@@ -259,24 +283,40 @@ stage1_load_loop_entry:
 
 .relocated:
         ;
-        ; Load the next 30 sectors of the volume to 0x9000.
+        ; Load stage1.
         ;
         push word read_error            ; Push error code. (No return.)
-        mov ebx, [bp + match_lba]
-        add ebx, 2
         mov di, stage1
-        mov al, 30
+        mov eax, 1
+        mov bx, stage1_sector_count
 .read_loop:
-        mov esi, ebx
+        ; Check whether this sector index is reserved for something.
+        cmp ax, word [main.fsinfo_sector]
+        je .next_sector
+        cmp ax, word [main.backup_vbr_sector]
+        je .next_sector
+        cmp al, byte [main.post_VBR_sector]
+        je .next_sector
+
+        ; Read the next sector and move it into place.
+        mov esi, [bp + match_lba]
+
+        add esi, eax
         call read_sector
         jc near fail
         mov cx, 512
         mov si, sector_buffer
         cld
         rep movsb
-        inc ebx
-        dec al
-        jnz short .read_loop
+
+        ; Finish once we've read all the sectors.
+        dec bx
+        jz short .read_done
+
+.next_sector:
+        ; Advance to the next sector.
+        inc ax
+        jmp .read_loop
 
 .read_done:
         ;
@@ -291,9 +331,9 @@ stage1_load_loop_entry:
         ;
         ; pcboot post-VBR sector marker
         ;
-        ; In FAT32, if the reserved area disappeared somehow, this 32-bit value
-        ; would be the cluster 0x0a55aa55 with two of the reserved highest bits
-        ; set.  It is somewhat unlikely to appear by accident.
+        ; Use a marker that cannot collide with the FSInfo and backup VBR
+        ; sectors, which also inhabit the reserved area.
         ;
+        post_VBR_sector_marker:                 dd 0xcc99cc99
         times 508-($-stage1_load_loop_entry) db 0
-        dd 0xaa55aa55
+        dd post_VBR_sector_marker
