@@ -137,19 +137,18 @@ read_disk_lba:
         ;
         global read_disk_chs
 read_disk_chs:
-        lea si, [bp + 4]
         mov ah, 2
-        mov al, byte [bp + 12]  ; read count
-        mov ch, byte [si + 0]   ; cylinder's low 8 bits
-        mov cl, byte [si + 1]   ; cylinder's high 2 bits
-        shl cl, 6               ; shift cylinder high bits
-        or cl, byte [si + 4]    ; sector (0 - 62)
-        inc cl                  ; make sector one-based (1 - 63)
-        mov dh, byte [si + 2]   ; head
-        mov dl, [bp + 0]        ; disk
-        mov bx, [bp + 16]       ; buffer_offset
+        mov al, byte [bp + 12]          ; read count
+        mov ch, byte [(bp + 4) + 0]     ; cylinder's low 8 bits
+        mov cl, byte [(bp + 4) + 1]     ; cylinder's high 2 bits
+        shl cl, 6                       ; shift cylinder high bits
+        or cl, byte [(bp + 4) + 4]      ; sector (0 - 62)
+        inc cl                          ; make sector one-based (1 - 63)
+        mov dh, byte [(bp + 4) + 2]     ; head
+        mov dl, [bp + 0]                ; disk
+        mov bx, [bp + 16]               ; buffer_offset
         push es
-        mov es, [bp + 18]       ; buffer_segment
+        mov es, [bp + 18]               ; buffer_segment
         int 0x13
         pop es
         jc .fail
