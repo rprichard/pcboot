@@ -157,8 +157,3 @@ read_disk_chs:
 .fail:
         xor eax, eax
         ret
-
-
-        section .bss
-print_char_data:
-        resb 1
