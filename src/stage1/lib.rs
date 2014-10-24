@@ -28,21 +28,45 @@ mod std {
 #[path = "../shared/io.rs"]             mod io;
 #[path = "../shared/lowlevel.rs"]       mod lowlevel;
 
+mod fat32;
+
+const STAGE2_SIZE: uint = 0x40000;
+
+extern {
+    static mut _stage2: [u8, ..STAGE2_SIZE];
+    static mut _stage2_end: [u8, ..0];
+}
+
 #[no_mangle]
 pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
     println!("pcboot loading...");
 
-    let mut buffer = [0u8, ..io::SECTOR_SIZE];
-    let disk = io::open_disk(disk_number).unwrap();
-    io::read_disk_sectors(&disk, volume_lba, &mut buffer).unwrap();
-
-    for row in range(16, 32) {
-        for col in range(0, 16) {
-            print!("{:02x} ", buffer[row * 16 + col]);
-        }
-        println!("");
+    unsafe {
+        // Ideally, this check would be done at compile-time, but I do not know
+        // whether that is possible.
+        let linker_size =
+            _stage2_end.as_ptr().to_uint() - _stage2.as_ptr().to_uint();
+        assert!(linker_size == STAGE2_SIZE);
     }
 
+    let disk = io::open_disk(disk_number).unwrap();
+    let volume = fat32::open_volume(&disk, volume_lba as io::SectorIndex);
+    let mut offset = 0u;
+
+    fat32::read_file(
+        &volume, "STAGE2  BIN",
+        |chunk: &[u8, ..512]| -> fat32::ReadStatus {
+            unsafe {
+                print!(".");
+                core::slice::bytes::copy_memory(
+                    _stage2.slice_from_mut(offset),
+                    chunk);
+            }
+            offset += chunk.len();
+            fat32::Success
+        });
+
+    println!("");
     println!("done!");
     fail!();
 }

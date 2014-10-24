@@ -69,7 +69,7 @@ enum IoMethod {
     ChsMethod(Chs),
 }
 
-struct Disk {
+pub struct Disk {
     bios_number: u8,
     io_method: IoMethod,
 }

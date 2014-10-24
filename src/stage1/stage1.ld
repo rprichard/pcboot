@@ -58,4 +58,13 @@ SECTIONS
         _bss_end = .;
         _bss_size = _bss_end - _bss;
     }
+
+    . = 0x10000;
+
+    .stage2 : {
+        _stage2 = .;
+        . += 0x40000;
+        _stage2_end = .;
+        _stage2_size = _stage2_end - _stage2;
+    }
 }
