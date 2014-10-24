@@ -9,7 +9,7 @@ extern "C" {
 // Add no_split_stack to disable stack checking.  This function is used during
 // stack overflow handling.
 #[no_stack_check]
-fn halt() -> ! {
+pub fn halt() -> ! {
     unsafe {
         call_real_mode(halt_16bit);
 
