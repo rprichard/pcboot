@@ -13,14 +13,21 @@ SECTIONS
         *(.eh_frame);
     }
 
-    . = 0x800;
+    . = 0x600;
 
     .tls : {
         _tls = .;
-        . += 128;
+        . += 0x80;
         _tls_end = .;
         _tls_size = _tls_end - _tls;
         _tls_stack_limit = _tls + 0x30;
+    }
+
+    .bss : {
+        _bss = .;
+        *(.bss);
+        _bss_end = .;
+        _bss_size = _bss_end - _bss;
     }
 
     . = 0x5000;
@@ -54,19 +61,23 @@ SECTIONS
         *(.got.*);
     }
 
-    .bss : {
-        _bss = .;
-        *(.bss);
-        _bss_end = .;
-        _bss_size = _bss_end - _bss;
-    }
-
-    . = 0x10000;
+    . = 0xc800;
 
     .stage2 : {
         _stage2 = .;
-        . += 0x40000;
+        . += 0x73000;
         _stage2_end = .;
         _stage2_size = _stage2_end - _stage2;
+    }
+
+    . = 0x7ff80;
+
+    #
+    # This section reserves memory for the routine that transfers control to
+    # stage2.  That routine will move stage2 into place and potentially
+    # overwrite parts of stage1.
+    #
+    .transfer_code : {
+        . += 0x80;
     }
 }

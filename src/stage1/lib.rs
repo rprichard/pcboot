@@ -30,7 +30,7 @@ mod std {
 
 mod fat32;
 
-const STAGE2_SIZE: uint = 0x40000;
+const STAGE2_SIZE: uint = 0x73000;
 
 extern {
     static mut _stage2: [u8, ..STAGE2_SIZE];
