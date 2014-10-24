@@ -19,7 +19,7 @@ extern pcboot_main
 ;
 
 
-        section .text
+        section .text16
         global _entry
 _entry:
         bits 16

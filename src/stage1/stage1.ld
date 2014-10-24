@@ -38,6 +38,11 @@ SECTIONS
 
     . = 0x9000;
 
+    .image16 : {
+        *(.text16);
+        *(.data16);
+    }
+
     .image : {
         *(.text);
         *(.text.*);
@@ -45,9 +50,6 @@ SECTIONS
         *(.rodata.*);
         *(.data);
         *(.data.*);
-    }
-
-    .got : {
         *(.got);
         *(.got.*);
     }

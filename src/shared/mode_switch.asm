@@ -14,7 +14,7 @@ extern _tls_size
         ;    back to real mode.
         ;
 
-        section .data
+        section .data16
         align 8
 gdt:
         ; LGDT operand
@@ -45,7 +45,7 @@ gdt:
 .end:
 
 
-        section .text
+        section .text16
 
         ; Intel documents the process for switching between modes.[1]  In
         ; particular:

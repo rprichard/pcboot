@@ -1,6 +1,6 @@
 extern call_real_mode
 
-        section .text
+        section .text16
         bits 16
 
 

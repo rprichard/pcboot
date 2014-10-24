@@ -4,7 +4,7 @@ extern call_real_mode
 ; Lowlevel routines
 ;
 
-        section .text
+        section .text16
 
 
         ;

@@ -67,7 +67,7 @@ build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 		$(STAGE1_OBJECTS) \
 		$(RUST_TARGET_LIB_PATH)/libmorestack.a \
 		$(RUST_TARGET_LIB_PATH)/libcompiler-rt.a
-	objcopy -j.image -j.got -Obinary build/stage1/stage1.elf build/stage1.bin
+	objcopy -j.image16 -j.image -Obinary build/stage1/stage1.elf build/stage1.bin
 
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
 
