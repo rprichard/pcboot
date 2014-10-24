@@ -14,17 +14,15 @@
         ;
         ; Input: DL is the value provided by the previous boot stage (i.e. BIOS
         ;            or MBR)
-        ; Trashes: CL, flags
+        ; Trashes: flags
         ;
         ; GRUB and GRUB2 use DL, but with some kind of adjustment.  Follow the
         ; GRUB2 convention and use DL if it's in the range 0x80-0x8f.
         ; Otherwise, fall back to 0x80.
         ;
 %macro init_disk_number 0
-        mov cl, 0xf0
-        and cl, dl
-        cmp cl, 0x80
-        jne short .dl_is_implausible
+        cmp dl, 0x8f                    ; Use a signed 8-bit comparison.
+        jg short .dl_is_implausible     ; 0x80 is INT8_MIN.
         mov [bp + disk_number], dl
 .dl_is_implausible:
 %endmacro
