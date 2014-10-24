@@ -94,6 +94,7 @@ pub fn open_volume<'a>(disk: &'a io::Disk, sector: io::SectorIndex) ->
     assert!(vbr.total_sectors_16 == 0);
     assert!(vbr.boot_signature == 0xaa55);
     assert!(vbr.bytes_per_sec == 512);
+    assert!(vbr.sec_per_clust != 0);
 
     let sector_lba = sector as u32;
     let fat_area_sectors = vbr.fat_count as u32 * vbr.sec_per_fat_32;
@@ -129,16 +130,118 @@ pub enum ReadStatus {
     Abort,
 }
 
-fn read_fat_entry(volume: &Fat32Volume, cluster: u32) -> u32 {
-    let fat_offset = cluster * 4;
-    let sector = fat_offset / 512;
-    let sector_offset = fat_offset % 512;
-    let mut buffer = [0u8, ..512];
-    io::read_disk_sectors(
-        volume.disk,
-        volume.start_fat_sector + sector,
-        &mut buffer).unwrap();
-    get32(&buffer, sector_offset as uint)
+const FAT_TABLE_CACHE_SIZE: uint = 1024;
+
+struct FatTable<'a> {
+    volume: &'a Fat32Volume<'a>,
+    cache_lba: Option<u32>,
+    cache_buffer: [u8, ..FAT_TABLE_CACHE_SIZE],
+}
+
+impl<'a> FatTable<'a> {
+    fn entry(&mut self, cluster: u32) -> u32 {
+        let fat_offset = cluster * 4;
+        let cache_size = FAT_TABLE_CACHE_SIZE as u32;
+        let sector = fat_offset / cache_size * (cache_size / 512);
+        let offset = fat_offset % cache_size;
+
+        let cache_hit = match self.cache_lba {
+            None => false,
+            Some(cache_lba) => cache_lba == sector
+        };
+
+        if !cache_hit {
+            self.cache_lba = Some(sector);
+            io::read_disk_sectors(
+                self.volume.disk,
+                self.volume.start_fat_sector + sector,
+                &mut self.cache_buffer).unwrap();
+        }
+        get32(&self.cache_buffer, offset as uint)
+    }
+}
+
+fn fat_table<'a>(volume: &'a Fat32Volume<'a>) -> FatTable<'a> {
+    FatTable {
+        volume: volume,
+        cache_lba: None,
+        cache_buffer: [0u8, ..FAT_TABLE_CACHE_SIZE]
+    }
+}
+
+struct ClusterIterator<'a> {
+    fat_table: &'a mut FatTable<'a>,
+    next : Option<u32>,
+}
+
+impl<'a> ClusterIterator<'a> {
+    fn next(&mut self) -> Option<u32> {
+        match self.next {
+            None => None,
+            Some(cluster) => {
+                // TODO: Do we need to do this masking in more places?
+                let next = self.fat_table.entry(cluster) & 0x0fff_ffff;
+                self.next = {
+                    if next >= 2 && (next - 2) <
+                            self.fat_table.volume.total_clusters {
+                        Some(next)
+                    } else if next >= 0x0fff_fff8 {
+                        None
+                    } else {
+                        fail!("FAT entry for cluster 0x{:x} is bad (0x{:x})",
+                            cluster, next);
+                    }
+                };
+                Some(cluster)
+            }
+        }
+    }
+}
+
+fn iterate_cluster_chain<'a>(
+        fat_table: &'a mut FatTable<'a>,
+        cluster: u32) -> ClusterIterator<'a> {
+    ClusterIterator {
+        fat_table: fat_table,
+        next: Some(cluster),
+    }
+}
+
+struct SectorIterator<'a> {
+    volume: &'a Fat32Volume<'a>,
+    cluster_iterator: ClusterIterator<'a>,
+    next_count: u8,
+    next_ret: u32,
+}
+
+impl<'a> SectorIterator<'a> {
+    fn next(&mut self) -> Option<u32> {
+        if self.next_count == 0 {
+            match self.cluster_iterator.next() {
+                None => { return None; },
+                Some(cluster) => {
+                    self.next_ret =
+                        self.volume.start_data_sector +
+                            (cluster - 2) * (self.volume.sec_per_clust as u32);
+                    self.next_count = self.volume.sec_per_clust;
+                }
+            }
+        }
+        let ret = self.next_ret;
+        self.next_count -= 1;
+        Some(ret)
+    }
+}
+
+fn iterate_node_sectors<'a>(
+        fat_table: &'a mut FatTable<'a>,
+        cluster: u32) -> SectorIterator<'a> {
+    SectorIterator {
+        volume: fat_table.volume,
+        cluster_iterator: iterate_cluster_chain(fat_table, cluster),
+        next_count: 0,
+        next_ret: 0,
+    }
 }
 
 // TODO: I think I'd like to parameterize this function's return type, but
@@ -147,40 +250,27 @@ fn read_cluster_chain(
         volume: &Fat32Volume,
         cluster: u32,
         readfn: |buffer: &[u8, ..512]| -> ReadStatus) -> ReadStatus {
-    let mut curr_cluster = cluster;
-    loop {
-        // The first and last data clusters are 2 and
-        // volume.total_clusters + 1.
-        assert!(curr_cluster - 2 < volume.total_clusters);
-        for i in iter::range(0, volume.sec_per_clust) {
-            // TODO: Read more than one sector at a time.  We need to figure
-            // out how/where to allocate the buffer.
-            // TODO: I think we also need to read more than one cluster at a
-            // time.  A small FAT32 volume has 1-sector-per-cluster, but the
-            // files are nevertheless contiguous on disk.
-            let mut buffer = [0u8, ..512];
-            io::read_disk_sectors(
-                volume.disk,
-                volume.start_data_sector + (i as u32) +
-                    (curr_cluster - 2) * (volume.sec_per_clust as u32),
-                &mut buffer).unwrap();
-            match readfn(&buffer) {
-                Success => {},
-                Abort => { return Abort; },
-            }
-        }
-        let next_entry = read_fat_entry(volume, curr_cluster);
-        // TODO: Do we need to do this masking in more places?
-        let masked_entry = next_entry & 0x0fff_ffff;
-        if (masked_entry - 2) < volume.total_clusters {
-            curr_cluster = masked_entry;
-        } else if masked_entry >= 0x0fff_fff8 {
-            return Success;
-        } else {
-            fail!("FAT entry for cluster 0x{:x} is bad (0x{:x})",
-                curr_cluster, next_entry);
+    let mut table = fat_table(volume);
+    let mut it = iterate_node_sectors(&mut table, cluster);
+    let mut sector: Option<u32>;
+
+    // TODO: Test reading on a volume with more than one sector per cluster.
+    // TODO: Read more than one sector at a time.  We need to figure
+    // out how/where to allocate the buffer.
+    let mut buffer = [0u8, ..512];
+
+    while { sector = it.next(); sector != None } {
+        io::read_disk_sectors(
+            volume.disk,
+            sector.unwrap(),
+            &mut buffer).unwrap();
+        match readfn(&buffer) {
+            Success => {},
+            Abort => { return Abort; },
         }
     }
+
+    Success
 }
 
 // TODO: We need to propagate failure and verify that the cluster chain matches
