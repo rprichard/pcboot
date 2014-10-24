@@ -115,6 +115,7 @@ init_protected_mode:
         ; (i.e. the second argument to call_real_mode).  EAX/EDX are zero on
         ; entry, and their value is returned to call_real_mode's caller.  The
         ; callee is not required to preserve any of the eight GPRs except ESP.
+        ; The callee may also trash any segment register.
         ;
         ; The "callee" function and the .stack section must be located within
         ; the first 64 KiB of memory.  The SS register is initialized to 0 in
@@ -167,6 +168,8 @@ call_real_mode:
 
         ; Switch to protected mode.
         cli
+        xor si, si
+        mov ds, si
         lgdt [gdt]
         mov esi, cr0
         xor si, 1

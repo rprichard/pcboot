@@ -38,7 +38,7 @@ check_for_int13_extensions:
         ;
         ; Arguments:
         ; [bp+0] disk: u8
-        ; [bp+4] geometry: &mut io::Chs
+        ; [bp+4] geometry: far *mut io::Chs
         ;
         ;    struct Chs {
         ;        cylinder: u16,
@@ -71,6 +71,7 @@ get_disk_geometry:
         ;  - Cylinder indices start at zero, so Cc (count of cylinders) is
         ;    Cm + 1.
 
+        mov ds, [bp + 6]
         mov di, [bp + 4]
 
         ; Write geometry.cylinder

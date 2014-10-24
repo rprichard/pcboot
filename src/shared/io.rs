@@ -88,10 +88,12 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
     } else {
         unsafe {
             let mut geometry = Chs { cylinder: 0, head: 0, sector: 0 };
+            let geometry_ptr =
+                addr_linear_to_segmented(&mut geometry as *mut Chs as u32);
             if call_real_mode(
                     get_disk_geometry,
                     bios_disk_number as u32,
-                    &mut geometry) as u8 == 0 {
+                    geometry_ptr) as u8 == 0 {
                 return Err("cannot read disk geometry");
             }
             Ok(Disk {
