@@ -164,12 +164,12 @@ fn fat_table<'a>(volume: &'a Fat32Volume<'a>) -> FatTable<'a> {
     }
 }
 
-struct ClusterIterator<'a> {
-    fat_table: &'a mut FatTable<'a>,
+struct ClusterIterator<'a, 'b:'a> {
+    fat_table: &'a mut FatTable<'b>,
     next : Option<u32>,
 }
 
-impl<'a> ClusterIterator<'a> {
+impl<'a, 'b> ClusterIterator<'a, 'b> {
     fn next(&mut self) -> Option<u32> {
         match self.next {
             None => None,
@@ -193,23 +193,23 @@ impl<'a> ClusterIterator<'a> {
     }
 }
 
-fn iterate_cluster_chain<'a>(
-        fat_table: &'a mut FatTable<'a>,
-        cluster: u32) -> ClusterIterator<'a> {
+fn iterate_cluster_chain<'a, 'b>(
+        fat_table: &'a mut FatTable<'b>,
+        cluster: u32) -> ClusterIterator<'a, 'b> {
     ClusterIterator {
         fat_table: fat_table,
         next: Some(cluster),
     }
 }
 
-struct SectorIterator<'a> {
-    volume: &'a Fat32Volume<'a>,
-    cluster_iterator: ClusterIterator<'a>,
+struct SectorIterator<'a, 'b:'a> {
+    volume: &'b Fat32Volume<'b>,
+    cluster_iterator: ClusterIterator<'a, 'b>,
     next_count: u8,
     next_ret: u32,
 }
 
-impl<'a> SectorIterator<'a> {
+impl<'a, 'b> SectorIterator<'a, 'b> {
     fn next(&mut self) -> Option<u32> {
         if self.next_count == 0 {
             match self.cluster_iterator.next() {
@@ -228,9 +228,9 @@ impl<'a> SectorIterator<'a> {
     }
 }
 
-fn iterate_node_sectors<'a>(
-        fat_table: &'a mut FatTable<'a>,
-        cluster: u32) -> SectorIterator<'a> {
+fn iterate_node_sectors<'a, 'b>(
+        fat_table: &'a mut FatTable<'b>,
+        cluster: u32) -> SectorIterator<'a, 'b> {
     SectorIterator {
         volume: fat_table.volume,
         cluster_iterator: iterate_cluster_chain(fat_table, cluster),
@@ -239,8 +239,8 @@ fn iterate_node_sectors<'a>(
     }
 }
 
-struct FragmentIterator<'a> {
-    sector_iterator: SectorIterator<'a>,
+struct FragmentIterator<'a, 'b:'a> {
+    sector_iterator: SectorIterator<'a, 'b>,
     max_sectors: u32,
     queued: Option<u32>,
 }
@@ -250,7 +250,7 @@ struct Fragment {
     sector_count: u32,
 }
 
-impl<'a> FragmentIterator<'a> {
+impl<'a, 'b> FragmentIterator<'a, 'b> {
     fn next(&mut self) -> Option<Fragment> {
         let start_sector = {
             if self.queued.is_none() {
@@ -285,10 +285,10 @@ impl<'a> FragmentIterator<'a> {
     }
 }
 
-fn iterate_fragments<'a>(
-        fat_table: &'a mut FatTable<'a>,
+fn iterate_fragments<'a, 'b>(
+        fat_table: &'a mut FatTable<'b>,
         cluster: u32,
-        max_sectors: u32) -> FragmentIterator<'a> {
+        max_sectors: u32) -> FragmentIterator<'a, 'b> {
     FragmentIterator {
         sector_iterator: iterate_node_sectors(fat_table, cluster),
         max_sectors: max_sectors,
@@ -301,10 +301,10 @@ struct FileLocation {
     size: u32,
 }
 
-fn find_file<'a>(
+fn find_file(
     volume: &Fat32Volume,
     name: &str,
-    fat_table: &'a mut FatTable<'a>,
+    fat_table: &mut FatTable,
     tmp_buf: &mut [u8]) -> Option<FileLocation>
 {
     let mut it = iterate_fragments(
@@ -348,11 +348,11 @@ fn round_up(base: u32, multiplier: u32) -> u32 {
     (base + multiplier - 1) / multiplier * multiplier
 }
 
-fn read_node_data<'a>(
+fn read_node_data(
         volume: &Fat32Volume,
         location: FileLocation,
         buffer: &mut [u8],
-        fat_table: &'a mut FatTable<'a>) {
+        fat_table: &mut FatTable) {
     let mut it = iterate_fragments(
         fat_table, location.cluster, 0xffff_ffff);
     let mut fragment: Option<Fragment>;
@@ -376,23 +376,14 @@ pub fn read_file_reusing_buffer_in_find(
         volume: &Fat32Volume,
         name: &str,
         buffer: &mut [u8]) -> u32 {
-
-    // TODO: Why can't I reuse the same table for both calls?  Something is
-    // going wrong with lifetimes.
-
     let mut table = fat_table(volume);
-    let location = { match find_file(volume, name, &mut table, buffer) {
+    match find_file(volume, name, &mut table, buffer) {
         None => {
             fail!("File '{}' missing from pcboot volume!", name);
         }
         Some(location) => {
-            location
+            read_node_data(volume, location, buffer, &mut table);
+            location.size
         }
-    }};
-
-    {
-        let mut table = fat_table(volume);
-        read_node_data(volume, location, buffer, &mut table);
-        location.size
     }
 }
