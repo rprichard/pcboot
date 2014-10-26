@@ -125,11 +125,6 @@ fn get32(buffer: &[u8], offset: uint) -> u32 {
     ((buffer[offset + 3] as u32) << 24)
 }
 
-pub enum ReadStatus {
-    Success,
-    Abort,
-}
-
 const FAT_TABLE_CACHE_SIZE: uint = 1024;
 
 struct FatTable<'a> {
@@ -244,66 +239,160 @@ fn iterate_node_sectors<'a>(
     }
 }
 
-// TODO: I think I'd like to parameterize this function's return type, but
-// I'm concerned that it would bloat code size.
-fn read_cluster_chain(
-        volume: &Fat32Volume,
-        cluster: u32,
-        readfn: |buffer: &[u8, ..512]| -> ReadStatus) -> ReadStatus {
-    let mut table = fat_table(volume);
-    let mut it = iterate_node_sectors(&mut table, cluster);
-    let mut sector: Option<u32>;
-
-    // TODO: Test reading on a volume with more than one sector per cluster.
-    // TODO: Read more than one sector at a time.  We need to figure
-    // out how/where to allocate the buffer.
-    let mut buffer = [0u8, ..512];
-
-    while { sector = it.next(); sector != None } {
-        io::read_disk_sectors(
-            volume.disk,
-            sector.unwrap(),
-            &mut buffer).unwrap();
-        match readfn(&buffer) {
-            Success => {},
-            Abort => { return Abort; },
-        }
-    }
-
-    Success
+struct FragmentIterator<'a> {
+    sector_iterator: SectorIterator<'a>,
+    max_sectors: u32,
+    queued: Option<u32>,
 }
 
-// TODO: We need to propagate failure and verify that the cluster chain matches
-// the expected file size, and stop sending excess bytes to the callback.
-pub fn read_file(
+struct Fragment {
+    start_sector: u32,
+    sector_count: u32,
+}
+
+impl<'a> FragmentIterator<'a> {
+    fn next(&mut self) -> Option<Fragment> {
+        let start_sector = {
+            if self.queued.is_none() {
+                match self.sector_iterator.next() {
+                    None => { return None; },
+                    Some(sector) => sector
+                }
+            } else {
+                self.queued.unwrap()
+            }
+        };
+        let mut last_sector = start_sector;
+        while (last_sector - start_sector + 1) < self.max_sectors {
+            match self.sector_iterator.next() {
+                None => {
+                    break;
+                },
+                Some(sector) => {
+                    if (sector == last_sector + 1) {
+                        last_sector = sector;
+                    } else {
+                        self.queued = Some(sector);
+                        break;
+                    }
+                },
+            }
+        }
+        Some(Fragment {
+            start_sector: start_sector,
+            sector_count: last_sector - start_sector + 1
+        })
+    }
+}
+
+fn iterate_fragments<'a>(
+        fat_table: &'a mut FatTable<'a>,
+        cluster: u32,
+        max_sectors: u32) -> FragmentIterator<'a> {
+    FragmentIterator {
+        sector_iterator: iterate_node_sectors(fat_table, cluster),
+        max_sectors: max_sectors,
+        queued: None,
+    }
+}
+
+struct FileLocation {
+    cluster: u32,
+    size: u32,
+}
+
+fn find_file<'a>(
+    volume: &Fat32Volume,
+    name: &str,
+    fat_table: &'a mut FatTable<'a>,
+    tmp_buf: &mut [u8]) -> Option<FileLocation>
+{
+    let mut it = iterate_fragments(
+        fat_table, volume.root_dir_clust, tmp_buf.len() as u32 / 512);
+    let mut fragment: Option<Fragment>;
+    while { fragment = it.next(); fragment.is_some() } {
+        let read_buffer = tmp_buf.slice_to_mut(
+            (fragment.unwrap().sector_count * 512) as uint);
+        io::read_disk_sectors(
+            volume.disk,
+            fragment.unwrap().start_sector,
+            read_buffer).unwrap();
+
+        // Is there a safe/better way to do this?
+        let table: &[DirEntry] =
+            unsafe {
+                core::mem::transmute(
+                    core::raw::Slice {
+                        data: read_buffer.as_ptr(),
+                        len: read_buffer.len() /
+                            core::mem::size_of::<DirEntry>(),
+                    })
+            };
+
+        for entry in table.iter() {
+            if (entry.attr & !ALL_FILE_ATTRIBUTES) == 0 &&
+                    entry.name == name.as_bytes() {
+                return Some(FileLocation {
+                    cluster: ((entry.cluster_hi as u32) << 16) +
+                             (entry.cluster_lo as u32),
+                    size: entry.size
+                });
+            }
+        }
+    }
+    None
+}
+
+// TODO: How is this made generic?
+fn round_up(base: u32, multiplier: u32) -> u32 {
+    (base + multiplier - 1) / multiplier * multiplier
+}
+
+fn read_node_data<'a>(
+        volume: &Fat32Volume,
+        location: FileLocation,
+        buffer: &mut [u8],
+        fat_table: &'a mut FatTable<'a>) {
+    let mut it = iterate_fragments(
+        fat_table, location.cluster, 0xffff_ffff);
+    let mut fragment: Option<Fragment>;
+    let mut offset = 0u32;
+    let cluster_bytes = volume.sec_per_clust as u32 * 512;
+    let full_size = round_up(location.size, cluster_bytes);
+    while { fragment = it.next(); fragment.is_some() } {
+        let fragment_bytes = fragment.unwrap().sector_count * 512;
+        assert!(offset + fragment_bytes <= full_size);
+        io::read_disk_sectors(
+            volume.disk,
+            fragment.unwrap().start_sector,
+            buffer.slice_mut(offset as uint, fragment_bytes as uint)).unwrap();
+        offset += fragment_bytes;
+    }
+    assert!(offset == full_size);
+}
+
+// Returns the size of the file returned.
+pub fn read_file_reusing_buffer_in_find(
         volume: &Fat32Volume,
         name: &str,
-        readfn: |buffer: &[u8, ..512]| -> ReadStatus) -> ReadStatus {
+        buffer: &mut [u8]) -> u32 {
 
-    // TODO: Try to combine or eliminate these variables somehow.
-    let mut found = false;
-    let mut cluster = 0u32;
+    // TODO: Why can't I reuse the same table for both calls?  Something is
+    // going wrong with lifetimes.
 
-    read_cluster_chain(
-        volume,
-        volume.root_dir_clust,
-        |buffer: &[u8, ..512]| -> ReadStatus {
-            let table: &[DirEntry, ..16] =
-                unsafe { core::mem::transmute(buffer) };
-            for entry in table.iter() {
-                if (entry.attr & !ALL_FILE_ATTRIBUTES) == 0 &&
-                        entry.name == name.as_bytes() {
-                    found = true;
-                    cluster = ((entry.cluster_hi as u32) << 16) +
-                              (entry.cluster_lo as u32);
-                    break;
-                }
-            }
-            Abort
-        });
-    if !found {
-        return Abort;
+    let mut table = fat_table(volume);
+    let location = { match find_file(volume, name, &mut table, buffer) {
+        None => {
+            fail!("File '{}' missing from pcboot volume!", name);
+        }
+        Some(location) => {
+            location
+        }
+    }};
+
+    {
+        let mut table = fat_table(volume);
+        read_node_data(volume, location, buffer, &mut table);
+        location.size
     }
-    // TODO: Pass a lambda by value or by reference?
-    read_cluster_chain(volume, cluster, readfn)
 }

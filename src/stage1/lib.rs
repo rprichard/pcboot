@@ -53,18 +53,10 @@ pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
     let volume = fat32::open_volume(&disk, volume_lba as io::SectorIndex);
     let mut offset = 0u;
 
-    fat32::read_file(
-        &volume, "STAGE2  BIN",
-        |chunk: &[u8, ..512]| -> fat32::ReadStatus {
-            unsafe {
-                print!(".");
-                core::slice::bytes::copy_memory(
-                    _stage2.slice_from_mut(offset),
-                    chunk);
-            }
-            offset += chunk.len();
-            fat32::Success
-        });
+    unsafe {
+        let bytes = fat32::read_file_reusing_buffer_in_find(&volume, "STAGE2  BIN", _stage2);
+        println!("read {} bytes", bytes);
+    }
 
     println!("");
     println!("done!");
