@@ -1,5 +1,6 @@
 use core;
 use core::iter;
+use core::num;
 use core::prelude::*;
 
 use io;
@@ -343,9 +344,8 @@ fn find_file(
     None
 }
 
-// TODO: How is this made generic?
-fn round_up(base: u32, multiplier: u32) -> u32 {
-    (base + multiplier - 1) / multiplier * multiplier
+fn round_up<T: Unsigned>(base: T, multiplier: T) -> T {
+    (base + multiplier - num::one()) / multiplier * multiplier
 }
 
 fn read_node_data(
