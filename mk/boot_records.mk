@@ -17,6 +17,7 @@ build/vbr.bin : boot_records/vbr.ld
 build/dummy_fat_vbr.bin : boot_records/dummy_fat_vbr.ld
 	mk/build_boot_record_elf.sh dummy_fat_vbr
 	mk/extract_boot_sector.sh dummy_fat_vbr 0 0
+	mv build/boot_records/dummy_fat_vbr.bin build/dummy_fat_vbr.bin
 
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) \
 	build/mbr.bin \
