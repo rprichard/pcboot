@@ -85,10 +85,10 @@ const ALL_FILE_ATTRIBUTES: u8 =
 
 pub fn open_volume<'a>(disk: &'a io::Disk, sector: io::SectorIndex) ->
         Fat32Volume<'a> {
-    let vbr: Fat32VBR = unsafe {
+    let vbr: Fat32VBR = {
         let mut vbr_data = [0u8, ..512];
         io::read_disk_sectors(disk, sector, &mut vbr_data).unwrap();
-        core::mem::transmute(vbr_data)
+        unsafe { core::mem::transmute(vbr_data) }
     };
 
     assert!(vbr.sec_per_fat_16 == 0);

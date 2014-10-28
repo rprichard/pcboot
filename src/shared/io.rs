@@ -86,21 +86,21 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
             io_method: LbaMethod
         })
     } else {
+        let mut geometry = Chs { cylinder: 0, head: 0, sector: 0 };
+        let geometry_ptr =
+            addr_linear_to_segmented(&mut geometry as *mut Chs as u32);
         unsafe {
-            let mut geometry = Chs { cylinder: 0, head: 0, sector: 0 };
-            let geometry_ptr =
-                addr_linear_to_segmented(&mut geometry as *mut Chs as u32);
             if call_real_mode(
                     get_disk_geometry,
                     bios_disk_number as u32,
                     geometry_ptr) as u8 == 0 {
                 return Err("cannot read disk geometry");
             }
-            Ok(Disk {
-                bios_number: bios_disk_number,
-                io_method: ChsMethod(geometry)
-            })
         }
+        Ok(Disk {
+            bios_number: bios_disk_number,
+            io_method: ChsMethod(geometry)
+        })
     }
 }
 
@@ -159,7 +159,7 @@ pub fn read_disk_sectors(
         let mut iter_count: i8;
 
         match disk.io_method {
-            LbaMethod => unsafe {
+            LbaMethod => {
                 iter_count = cmp::min(loop_count, 127) as i8;
                 #[repr(C)]
                 struct DiskAccessPacket {
@@ -180,15 +180,17 @@ pub fn read_disk_sectors(
                     lba: loop_sector,
                     lba_high: 0
                 };
-                if call_real_mode(
-                        read_disk_lba,
-                        disk.bios_number as u32,
-                        dap) as u8 == 0 {
-                    return Err("disk read error");
+                unsafe {
+                    if call_real_mode(
+                            read_disk_lba,
+                            disk.bios_number as u32,
+                            dap) as u8 == 0 {
+                        return Err("disk read error");
+                    }
                 }
             },
 
-            ChsMethod(geometry) => unsafe {
+            ChsMethod(geometry) => {
                 match convert_lba_to_chs(loop_sector, &geometry) {
                     Ok(chs) => {
                         // For maximum compatibility, avoid doing a read that
@@ -197,14 +199,16 @@ pub fn read_disk_sectors(
                             cmp::min(loop_count,
                                 (geometry.sector - chs.sector) as SectorIndex)
                                     as i8;
-                        if call_real_mode(
-                                read_disk_chs,
-                                disk.bios_number as u32,
-                                chs,
-                                iter_count as u32,
-                                addr_linear_to_segmented(loop_buffer))
-                                as u8 == 0 {
-                            return Err("disk read error");
+                        unsafe {
+                            if call_real_mode(
+                                    read_disk_chs,
+                                    disk.bios_number as u32,
+                                    chs,
+                                    iter_count as u32,
+                                    addr_linear_to_segmented(loop_buffer))
+                                    as u8 == 0 {
+                                return Err("disk read error");
+                            }
                         }
                     },
                     Err(msg) => { return Err(msg) }
