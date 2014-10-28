@@ -24,7 +24,8 @@ RUST_FLAGS := \
 	-O --opt-size \
 	-C no-vectorize-loops \
 	-C no-vectorize-slp \
-	-C relocation-model=static
+	-C relocation-model=static \
+	-C llvm-args=-rotation-max-header-size=0
 
 build/stage1/%.o : src/stage1/%.asm
 	mkdir -p $(dir $@)
