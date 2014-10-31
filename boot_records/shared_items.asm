@@ -38,6 +38,7 @@ missing_vbr_error:              equ error_char + 2
 duplicate_vbr_error:            equ error_char + 4
 geometry_error:                 equ error_char + 6
 missing_post_vbr_marker_error:  equ error_char + 8      ; VBR only
+bad_stage1_checksum_error:      equ error_char + 10     ; VBR only
 
 dap_size:                       equ 16
 

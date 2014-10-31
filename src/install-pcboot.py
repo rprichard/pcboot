@@ -7,6 +7,7 @@ import sys
 
 
 RESERVED_AREA_SECTORS = 32
+STAGE1_SECTORS = 28
 
 
 def _file_content(path):
@@ -89,6 +90,7 @@ def _initialize_volume_reserved_area(target):
         f.write(vbr_bin[512:1024])
 
         # Install the stage1 binary.
+        assert len(stage1_bin) == STAGE1_SECTORS * 512
         remaining = stage1_bin
         while len(remaining) > 0:
             sector = free_sectors.next()

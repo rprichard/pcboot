@@ -52,18 +52,13 @@
 ;
 
 
-;
-; TODO:
-;  - Compute a checksum of stage1 before jumping into it.
-;
-
-
         bits 16
 
 
 ;
 ; Memory layout:
 ;   0x600..0x7ff                MBR
+;   0x800..0xbff                CRC-32C table
 ;   ...
 ;   0x????..0x7bff              stack
 ;   0x7c00..0x7dff              executing VBR
@@ -79,6 +74,7 @@
 ;
 
 mbr:                            equ 0x600
+crc32c_table:                   equ 0x800
 vbr:                            equ 0x7c00
 stack:                          equ 0x7c00
 sector_buffer:                  equ 0x8000
@@ -319,6 +315,15 @@ stage1_load_loop_entry:
         jmp .read_loop
 
 .read_done:
+        ; Check the checksum.
+        mov si, stage1
+        mov cx, stage1_sector_count * 512 - 4
+        call crc32c
+        mov edx, [stage1 + stage1_sector_count * 512 - 4]
+        cmp eax, edx
+        push bad_stage1_checksum_error
+        jne fail
+
         ;
         ; Jump to stage1.
         ;  - dl is the BIOS disk number.
@@ -327,6 +332,10 @@ stage1_load_loop_entry:
         mov dl, byte [bp + disk_number]
         mov esi, [bp + match_lba]
         jmp stage1
+
+
+%include "crc32c.asm"
+
 
         ;
         ; pcboot post-VBR sector marker
