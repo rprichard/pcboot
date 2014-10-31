@@ -1,4 +1,6 @@
 #!/usr/bin/env python2
+import argparse
+import struct
 import sys
 
 
@@ -28,12 +30,19 @@ def crc32c(buffer):
 
 
 def _main():
-    if len(sys.argv) != 2 or sys.argv[1] in ("-h", "-help", "--help"):
-        print("Usage: %s filename" % sys.argv[0])
-        sys.exit(1)
-    with open(sys.argv[1], "r") as f:
+    parser = argparse.ArgumentParser(
+        description="Compute a CRC-32C checksum of a file")
+    parser.add_argument("filename")
+    parser.add_argument("--raw-output", default=False, action="store_true",
+        help="Print 4 bytes of output to stdout")
+    args = parser.parse_args()
+    with open(args.filename, "r") as f:
         data = f.read()
-    print "%x" % crc32c(data)
+    result = crc32c(data)
+    if args.raw_output:
+        sys.stdout.write(struct.pack("<I", result))
+    else:
+        print "%x" % result
 
 
 if __name__ == "__main__":

@@ -13,8 +13,9 @@ mkdir -p test
 # Create the pcboot volume.
 dd if=/dev/zero of=test/bootvol bs=1MiB count=63
 mkfs.msdos -F32 -h2048 test/bootvol
-#mcopy -itest/bootvol /boot/memtest86+.bin ::/MEMTEST.BIN   # reenable later maybe(?)
-mcopy -itest/bootvol /boot/memtest86+.bin ::/STAGE2.BIN   # reenable later maybe(?)
+cp /boot/memtest86+.bin test/dummy_stage2.bin
+mk/crc32c.py --raw-output test/dummy_stage2.bin >> test/dummy_stage2.bin
+mcopy -itest/bootvol test/dummy_stage2.bin ::/STAGE2.BIN
 
 # Create the disk image.
 dd if=/dev/zero of=test/disk bs=1MiB count=64

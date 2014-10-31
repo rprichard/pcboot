@@ -119,13 +119,6 @@ pub fn open_volume<'a>(disk: &'a io::Disk, sector: io::SectorIndex) ->
     }
 }
 
-fn get32(buffer: &[u8], offset: uint) -> u32 {
-    ((buffer[offset + 0] as u32) << 0) +
-    ((buffer[offset + 1] as u32) << 8) +
-    ((buffer[offset + 2] as u32) << 16) +
-    ((buffer[offset + 3] as u32) << 24)
-}
-
 const FAT_TABLE_CACHE_SIZE: uint = 1024;
 
 struct FatTable<'a> {
@@ -153,7 +146,7 @@ impl<'a> FatTable<'a> {
                 self.volume.start_fat_sector + sector,
                 &mut self.cache_buffer).unwrap();
         }
-        get32(&self.cache_buffer, offset as uint)
+        io::get32(&self.cache_buffer, offset as uint)
     }
 }
 

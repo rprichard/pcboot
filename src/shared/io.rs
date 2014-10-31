@@ -223,3 +223,10 @@ pub fn read_disk_sectors(
 
     Ok(())
 }
+
+pub fn get32(buffer: &[u8], offset: uint) -> u32 {
+    ((buffer[offset + 0] as u32) << 0) +
+    ((buffer[offset + 1] as u32) << 8) +
+    ((buffer[offset + 2] as u32) << 16) +
+    ((buffer[offset + 3] as u32) << 24)
+}
