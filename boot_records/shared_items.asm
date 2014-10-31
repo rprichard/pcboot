@@ -33,11 +33,11 @@
 ; 'A'.  Disk read errors do not immediately abort the loader, but if/when a
 ; fatal error occurs (e.g. cannot find VBR), the error is incremented by one.
 ;
-geometry_error:                 equ error_char + 0
-duplicate_vbr_error:            equ error_char + 2
-missing_vbr_error:              equ error_char + 4
-missing_post_vbr_marker_error:  equ error_char + 6
-read_error:                     equ error_char + 8
+read_error:                     equ error_char + 0
+missing_vbr_error:              equ error_char + 2
+duplicate_vbr_error:            equ error_char + 4
+geometry_error:                 equ error_char + 6
+missing_post_vbr_marker_error:  equ error_char + 8      ; VBR only
 
 dap_size:                       equ 16
 
