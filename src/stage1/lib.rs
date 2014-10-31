@@ -40,7 +40,7 @@ extern {
 
 #[no_mangle]
 pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
-    println!("pcboot loading...");
+    io::print_str("pcboot loading...\r\n");
 
     unsafe {
         // Ideally, this check would be done at compile-time, but I do not know
@@ -66,7 +66,6 @@ pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
         }
     }
 
-    println!("");
-    println!("done!");
-    fail!();
+    io::print_str("done!\r\n");
+    lowlevel::halt();
 }
