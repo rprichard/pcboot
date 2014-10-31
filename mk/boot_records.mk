@@ -11,7 +11,7 @@ build/vbr.bin : boot_records/vbr.ld
 	mk/build_boot_record_elf.sh vbr
 	mk/extract_boot_sector.sh vbr 0 0
 	mk/extract_boot_sector.sh vbr 3 1
-	mk/build_vbr_descriptor.py
+	python2 -B mk/build_vbr_descriptor.py
 	mv build/boot_records/vbr.bin build/vbr.bin
 
 build/dummy_fat_vbr.bin : boot_records/dummy_fat_vbr.ld

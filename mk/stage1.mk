@@ -69,7 +69,7 @@ build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 		$(RUST_TARGET_LIB_PATH)/libmorestack.a \
 		$(RUST_TARGET_LIB_PATH)/libcompiler-rt.a
 	objcopy -j.image16 -j.image -Obinary build/stage1/stage1.elf build/stage1/stage1.bin
-	mk/finalize_stage1.py
+	python2 -B mk/finalize_stage1.py
 
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
 
