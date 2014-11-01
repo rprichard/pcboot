@@ -109,6 +109,8 @@ get_disk_geometry:
 read_disk_lba:
         mov ah, 0x42
         mov dl, [bp + 0]
+        push ss
+        pop ds
         lea si, [bp + 4]
         int 0x13
         jc .fail
