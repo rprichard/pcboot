@@ -1,0 +1,92 @@
+commit 71e9f85ab1b84b9a3a70fd106998758872cb9a0d
+Author: Ryan Prichard <ryan.prichard@gmail.com>
+Date:   Wed Oct 15 14:12:40 2014 -0700
+
+    Add an --opt-size rustc flag and an opt_size function attribute.
+
+diff --git a/src/librustc/driver/config.rs b/src/librustc/driver/config.rs
+index f5423b2..4f48088 100644
+--- a/src/librustc/driver/config.rs
++++ b/src/librustc/driver/config.rs
+@@ -70,6 +70,7 @@ pub struct Options {
+ 
+     pub gc: bool,
+     pub optimize: OptLevel,
++    pub opt_size: bool,
+     pub debuginfo: DebugInfoLevel,
+     pub lint_opts: Vec<(String, lint::Level)>,
+     pub describe_lints: bool,
+@@ -110,6 +111,7 @@ pub fn basic_options() -> Options {
+         crate_types: Vec::new(),
+         gc: false,
+         optimize: No,
++        opt_size: false,
+         debuginfo: NoDebugInfo,
+         lint_opts: Vec::new(),
+         describe_lints: false,
+@@ -595,6 +597,7 @@ pub fn optgroups() -> Vec<getopts::OptGroup> {
+         optflag("O", "", "Equivalent to --opt-level=2"),
+         optopt("o", "", "Write output to <filename>", "FILENAME"),
+         optopt("", "opt-level", "Optimize with possible levels 0-3", "LEVEL"),
++        optflag("", "opt-size", "Optimize for small code"),
+         optopt( "",  "out-dir", "Write output to compiler-chosen filename in <dir>", "DIR"),
+         optflag("", "parse-only", "Parse only; do not compile, assemble, or link"),
+         optopt("", "explain", "Provide a detailed explanation of an error message", "OPT"),
+@@ -739,6 +742,7 @@ pub fn build_session_options(matches: &getopts::Matches) -> Options {
+             No
+         }
+     };
++    let opt_size = matches.opt_present("opt-size");
+     let gc = debugging_opts & GC != 0;
+     let debuginfo = if matches.opt_present("g") {
+         if matches.opt_present("debuginfo") {
+@@ -822,6 +826,7 @@ pub fn build_session_options(matches: &getopts::Matches) -> Options {
+         crate_types: crate_types,
+         gc: gc,
+         optimize: opt_level,
++        opt_size: opt_size,
+         debuginfo: debuginfo,
+         lint_opts: lint_opts,
+         describe_lints: describe_lints,
+diff --git a/src/librustc/lint/builtin.rs b/src/librustc/lint/builtin.rs
+index 76234c4..9e9e358 100644
+--- a/src/librustc/lint/builtin.rs
++++ b/src/librustc/lint/builtin.rs
+@@ -572,6 +572,7 @@ impl LintPass for UnusedAttributes {
+             "no_mangle",
+             "no_split_stack",
+             "no_stack_check",
++            "opt_size",
+             "packed",
+             "static_assert",
+             "thread_local",
+diff --git a/src/librustc/middle/trans/base.rs b/src/librustc/middle/trans/base.rs
+index ebc46bb..f663393 100644
+--- a/src/librustc/middle/trans/base.rs
++++ b/src/librustc/middle/trans/base.rs
+@@ -207,6 +207,9 @@ pub fn decl_fn(ccx: &CrateContext, name: &str, cc: llvm::CallConv,
+     if ccx.is_split_stack_supported() && !ccx.sess().opts.cg.no_stack_check {
+         set_split_stack(llfn);
+     }
++    if ccx.sess().opts.opt_size {
++        set_optimize_for_size(llfn);
++    }
+ 
+     llfn
+ }
+@@ -426,7 +429,6 @@ pub fn get_tydesc(ccx: &CrateContext, t: ty::t) -> Rc<tydesc_info> {
+     inf
+ }
+ 
+-#[allow(dead_code)] // useful
+ pub fn set_optimize_for_size(f: ValueRef) {
+     llvm::SetFunctionAttribute(f, llvm::OptimizeForSizeAttribute)
+ }
+@@ -474,6 +476,7 @@ pub fn set_llvm_fn_attrs(ccx: &CrateContext, attrs: &[ast::Attribute], llfn: Val
+                                                llvm::FunctionIndex as c_uint,
+                                                llvm::ColdAttribute as uint64_t)
+             },
++            "opt_size" => set_optimize_for_size(llfn),
+             _ => used = false,
+         }
+         if used {

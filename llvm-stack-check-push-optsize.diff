@@ -1,0 +1,39 @@
+commit f6c075860f14c3e3eedbd9c2c54d5243a37c9c69
+Author: Ryan Prichard <ryan.prichard@gmail.com>
+Date:   Mon Oct 27 00:38:25 2014 -0700
+
+    x86 segmented stacks: Use smaller push instructions when possible
+
+diff --git a/lib/Target/X86/X86FrameLowering.cpp b/lib/Target/X86/X86FrameLowering.cpp
+index 96954fc..44a4370 100644
+--- a/lib/Target/X86/X86FrameLowering.cpp
++++ b/lib/Target/X86/X86FrameLowering.cpp
+@@ -1347,6 +1347,15 @@ GetScratchRegister(bool Is64Bit, bool IsLP64, const MachineFunction &MF, bool Pr
+   return Primary ? X86::ECX : X86::EAX;
+ }
+ 
++// Select the smallest instruction for a 32-bit push of an immediate.
++static unsigned
++Push32ImmOpcode(int64_t Imm) {
++  if (Imm >= INT8_MIN && Imm <= INT8_MAX)
++    return X86::PUSH32i8;
++  else
++    return X86::PUSHi32;
++}
++
+ // The stack limit in the TCB is set to this many bytes above the actual stack
+ // limit.
+ static const uint64_t kSplitStackAvailable = 256;
+@@ -1526,9 +1535,10 @@ X86FrameLowering::adjustForSegmentedStacks(MachineFunction &MF) const {
+     MF.getRegInfo().setPhysRegUsed(Reg10);
+     MF.getRegInfo().setPhysRegUsed(Reg11);
+   } else {
+-    BuildMI(allocMBB, DL, TII.get(X86::PUSHi32))
++    BuildMI(allocMBB, DL, TII.get(Push32ImmOpcode(
++                                                X86FI->getArgumentStackSize())))
+       .addImm(X86FI->getArgumentStackSize());
+-    BuildMI(allocMBB, DL, TII.get(X86::PUSHi32))
++    BuildMI(allocMBB, DL, TII.get(Push32ImmOpcode(StackSize)))
+       .addImm(StackSize);
+   }
+ 
