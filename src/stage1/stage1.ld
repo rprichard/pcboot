@@ -65,9 +65,13 @@ SECTIONS
 
     .stage2 : {
         _stage2 = .;
+        _stage2_segment = . >> 4;
+        _stage2_reloc = 0x600;                  # Address to copy stage2 to.
+        _stage2_reloc_segment = _stage2_reloc >> 4;
         . += 0x73000;
         _stage2_end = .;
         _stage2_size = _stage2_end - _stage2;
+        _stage2_para_size = _stage2_size >> 4;
     }
 
     . = 0x7ff80;
@@ -78,6 +82,7 @@ SECTIONS
     # overwrite parts of stage1.
     #
     .transfer_code : {
+        _transfer_code_segment = . >> 4;
         . += 0x80;
     }
 }

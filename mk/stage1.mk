@@ -56,6 +56,7 @@ STAGE1_OBJECTS := \
 	build/shared/mode_switch.o \
 	build/shared/lowlevel.o \
 	build/shared/io.o \
+	build/stage1/transfer.o \
 	build/stage1/libstage1.rlib \
 	build/stage1/libcore.rlib \
 	build/stage1/librlibc.rlib

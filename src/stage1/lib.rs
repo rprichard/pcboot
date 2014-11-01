@@ -66,6 +66,11 @@ pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
         }
     }
 
-    io::print_str("done!\r\n");
+    extern "C" {
+        fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
+        fn transfer_to_stage2();
+    }
+
+    unsafe { call_real_mode(transfer_to_stage2, disk_number as u32, volume_lba); }
     lowlevel::halt();
 }

@@ -11,8 +11,9 @@ extern pcboot_main
 ;
 ; Guarantees on entry:
 ;  - stage1: IP is 0x9000, the address at which the image is loaded.
-;  - stage1: DL is the BIOS disk number
-;  - stage1: ESI is the LBA of the pcboot volume.
+;  - stage2: IP is 0x600, the address at which the image is loaded.
+;  - DL is the BIOS disk number
+;  - ESI is the LBA of the pcboot volume.
 ;  - CS, DS, and ES registers are all zeroed.
 ;
 ; This file will be listed first on the linker command-line.
