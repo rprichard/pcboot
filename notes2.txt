@@ -124,3 +124,30 @@ I've noticed that GRUB2 seems like it can fill two different roles -- either it
 can be a boot manager and select between, say, Windows XP and Windows 8, or
 it's really the boot loader for a particular Linux installation, and can
 incidentally load another OS, typically by chaining a boot sector.
+
+---
+
+Fundamentally, I think the goal here is:
+ - Eliminate the amount of lowlevel booting esoteria needed to get a new OS
+   working.  The multiboot spec (probably?) helps here, but GRUB adds too much
+   of its own complication.  I am also skeptical of multiboot, and it doesn't
+   help that Linux and most BSDs did not adopt it.
+ - An OS should be able to provide its own code for reading its filesystems and
+   perhaps implementing its own boot-time menu and/or load protocol, without
+   having to merge all of this code into the bootloader project.
+ - Provide a decent installation/management story for new and existing OS's.
+   An OS installer can't just blow away the MBR, and AFAIK, incorporating GRUB
+   into a new OS will tend to turn that new OS into a Linux distro.  There is
+   a strong incentive to use a chainloading VBR in a new OS design, but it's
+   hard to get that code right--every version of MBR/VBR code has its own
+   little quirks.
+
+The install story might be:
+ - The installer verifies that a PCBOOT System Partition exists on the boot
+   disk, and creates one if not.
+ - The installer registers the new OS boot volume with the PCBOOT System
+   Partition.  It installs a special module that can read the OS's file system,
+   and another module that knows how to boot the new OS.
+ - The installer writes a flag somewhere telling the PCBOOT system to re-probe
+   all the computer's disks looking for bootable things.  On the next boot,
+   pcboot detects the new OS and updates its menu.
