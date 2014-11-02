@@ -1,0 +1,126 @@
+2014-11-01 notes:
+ - Consider scanning drives for the matching PCBOOT volume.  How does GRUB's
+   MBR code find the /boot directory?
+ - Using a random 4-byte PCBOOT ID, what's the probablility of a collision?
+   Should the ID be larger, like say, 6 bytes?
+ - Consider having a separate "stub" bootloader that includes the current
+   MBR, VBR, and stage1.  Its sole responsibility is to load a "payload" into
+   memory.  The stub-to-payload API is stable.  For the most part, the API is
+   just "put the payload at 0x600 and run", but it might also include some kind
+   of "boot services" such as "issue a BIOS call", "read the FAT32 boot
+   volume", or "read the disk."
+ - Some "boot service" capability could be a library instead of a runtime
+   service.  Making something a service means making the API larger.
+ - Perhaps the payload could be a multiboot image, such as Xen, NetBSD, or even
+   GRUB2.  To write a new OS, you could avoid GRUB2 and just use this stub
+   loader.
+ - On the other hand, if you need a boot menu, with the ability to pass
+   command-lines, etc, then maybe you'd use a "pcboot menu" image or something.
+ - Consider enabling the A20 line early, then loading more things into the
+   memory above 1MiB.
+
+Ideas:
+ - Generally, the idea is to emulate parts of EFI's design.
+ - For an OS to be taken seriously on the PC platform (pre-EFI PCs anwyay), it
+   needs to play nicely in a multi-OS environment, which practically means
+   cooperating with the MBR partitioning and boot-sector schemes.
+ - Probably the uglist aspect of the boot process is how the MBR/VBR code is
+   hidden, but it *also* has configurable variables in it.  The current pcboot
+   "stub" has reduced this to a single variable, a 4-byte volume ID.  (stage1
+   also has to be maneuvered around the fsinfo and backup-VBR sectors, but that
+   configuration seems unlikely to ever matter.)
+    - In a way, Windows does better here -- its MBR does nothing but load the
+      bootable sector, and the boot flag is ubiquitously recognized as part of
+      the partition table state.  Its MBR limitations are a problem for
+      dual-booting, though.
+ - Multiple hard disks makes this ugliness even worse.
+    - It might make sense to create a tool that displays the current MBR state.
+      There are probably too many MBR programs to make this useful, sadly.
+      Still -- it's probably possible to identify a broad range of them.  If it
+      has the string "GRUB" in it, it's probably a GRUB bootloader.
+ - The goal is (mostly) to create a bootloader with maximal transparency,
+   reliability, and simplicity.  A Linux distro is virtually the only PC OS
+   that uses GRUB's flexibility.  In particular:
+    - Windows mandates an NTFS boot volume on an MBR disk (not a dynamic disk
+      or a GPT disk).  NTFS has a reserved region large enough to contain an
+      NTFS reader.[1]  The Windows MBR only loads the boot partition on the
+      boot disk.
+    - The BSDs I've looked at did not use GRUB (by default anyway) or the
+      post-MBR region.  Instead, they had very simplistic boot sectors.  Again,
+      IIRC, the UFS file system has a large reserved region at the front.
+   At the same time, though, these limitations genuinely *are* awkward, so
+   people who want to dual-boot might want GRUB.
+
+      [1] "When you format an NTFS volume, the format program allocates the
+      first 16 sectors for the $Boot metadata file. First sector, in fact, is a
+      boot sector with a "bootstrap" code and the following 15 sectors are the
+      boot sector's IPL (initial program loader)."
+      http://ntfs.com/ntfs-partition-boot-sector.htm
+
+ - There are a few ideas that GRUB seems to combine:
+    1. choosing the OS to boot on a multiple-OS PC
+    2. dealing with the ugly BIOS+BootSector environment
+    3. dealing with heterogeneity: disk layouts (MBR+GPT+LVM), file systems
+       (ext2,Reiser,btrfs,UFS), and OS boot protocols (linux, linux16, BSDs,
+       OSX, etc).
+   It seems like a bad idea for a single project to have to know about every
+   OS.  Moreover, it's somewhat false, because even though GRUB has special
+   knowledge of OSX's boot protocol, there's no reason to use GRUB for OSX.
+   (Essentially no one does that, because GRUB brings a lot of baggage without
+   solving a problem for OSX.)
+
+   Deciding which OS to support in GRUB proper is tricky -- it's something of
+   a political issue.  This is the major appeal of an EFI-like design.  We
+   design a single system--EFI--whose interesting state is contained in a
+   single partition--the ESP--which uses a fixed filesystem--FAT32.  Dealing
+   with the infinite variety of FS+OS combinations, then, is external to the
+   project.  For example, ext2 is realistically the Linux file system, so
+   booting from ext2 should be considered part of Linux.  Similarly, UFS is
+   part of BSD, and NTFS is part of Windows.  (It *seems* handy to have a
+   single pre-boot environment that knows all the filesystems; the problem is
+   that it must then know *everyone's* filesystems, and the project bloats.
+   Perhaps this justifies putting a VFS abstraction into the EFI-like
+   environment.)
+
+   With a BIOS-based boot system, we must have some hidden code outside the
+   "ESP volume", because BIOS sticks us with an MBR boot sector, and we're
+   practically stuck with Windows (and FlexNet et al), so we're also stuck with
+   the MS-DOS partitioning scheme (and therefore hidden VBR code).
+
+ - Specifying which OSs to boot is also interesting:
+    - Currently GRUB2 has scripts in /etc/grub.d that add boot entries.  There
+      are (large) shell scripts that probe for different OS's.  This is a clear
+      place where GRUB is trying to fill the select-an-OS role, while still
+      being installed and managed via a particular Linux distro.  What if I
+      have two Linux distros?
+    - Perhaps there should be a "probe_linux_distro" module that plugs into a
+      "pcboot_menu" module, and which scans the disks at boot-time looking for
+      things to boot?
+
+Things to investigate:
+ - How does GRUB2's MBR find the boot directory?  How does it find it if I'm
+   using a multiboot GRUB2 image?
+ - Do other multiboot images use a boot-time command-line?  What about initrd
+   images?
+ - I feel like I should know more about EFI boot.
+ - What happens if I try to install a second Linux distro on a computer, both
+   with BIOS boot and EFI boot?  With EFI, it will try to put GRUB into the EFI
+   ESP, I think, but will it allow two GRUBs?
+ - What's it like to erase Linux/GRUB from a machine, particularly one using
+   EFI?
+ - How does HaikuOS boot?  What about all the other BSDs?  Any other OSs to
+   examine?  Minix3?  I think Minix3 is multiboot, but also has boot sector
+   code based on NetBSD.
+ - Does parted know about PARTITION_OFFSET_OFFSET in Haiku's BFS filesystem?
+ - Do other bootloaders (e.g. GRUB/GRUB2) enable A20 early?  Does it interfere
+   with FreeDOS?
+
+Haiku has VBR code: src/system/boot/platform/bios_ia32/stage1.S
+ - There seems to be a single VBR sector followed by another sector with the
+   superblock and more boot code in it.  The code in the two sectors is
+   (maybe?) sufficient to read the filesystem.
+
+I've noticed that GRUB2 seems like it can fill two different roles -- either it
+can be a boot manager and select between, say, Windows XP and Windows 8, or
+it's really the boot loader for a particular Linux installation, and can
+incidentally load another OS, typically by chaining a boot sector.
