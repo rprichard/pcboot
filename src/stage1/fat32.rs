@@ -177,7 +177,7 @@ impl<'a, 'b> ClusterIterator<'a, 'b> {
                     } else if next >= 0x0fff_fff8 {
                         None
                     } else {
-                        fail!("FAT entry for cluster 0x{:x} is bad (0x{:x})",
+                        panic!("FAT entry for cluster 0x{:x} is bad (0x{:x})",
                             cluster, next);
                     }
                 };
@@ -324,8 +324,9 @@ fn find_file(
             };
 
         for entry in table.iter() {
+            let entry_unsized_name: &[u8] = &entry.name;
             if (entry.attr & !ALL_FILE_ATTRIBUTES) == 0 &&
-                    entry.name == name.as_bytes() {
+                    entry_unsized_name == name.as_bytes() {
                 return Some(FileLocation {
                     cluster: ((entry.cluster_hi as u32) << 16) +
                              (entry.cluster_lo as u32),
@@ -337,8 +338,8 @@ fn find_file(
     None
 }
 
-fn round_up<T: Unsigned>(base: T, multiplier: T) -> T {
-    (base + multiplier - num::one()) / multiplier * multiplier
+fn round_up<T: num::UnsignedInt>(base: T, multiplier: T) -> T {
+    (base + multiplier - num::Int::one()) / multiplier * multiplier
 }
 
 fn read_node_data(
@@ -372,7 +373,7 @@ pub fn read_file_reusing_buffer_in_find(
     let mut table = fat_table(volume);
     match find_file(volume, name, &mut table, buffer) {
         None => {
-            fail!("File '{}' missing from pcboot volume!", name);
+            panic!("File '{}' missing from pcboot volume!", name);
         }
         Some(location) => {
             read_node_data(volume, location, buffer, &mut table);

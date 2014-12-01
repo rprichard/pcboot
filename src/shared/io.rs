@@ -65,8 +65,8 @@ struct Chs {
 }
 
 enum IoMethod {
-    LbaMethod,
-    ChsMethod(Chs),
+    Lba,
+    Chs(Chs),
 }
 
 pub struct Disk {
@@ -83,7 +83,7 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
     if has_int13_extensions {
         Ok(Disk {
             bios_number: bios_disk_number,
-            io_method: LbaMethod
+            io_method: IoMethod::Lba
         })
     } else {
         let mut geometry = Chs { cylinder: 0, head: 0, sector: 0 };
@@ -99,7 +99,7 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
         }
         Ok(Disk {
             bios_number: bios_disk_number,
-            io_method: ChsMethod(geometry)
+            io_method: IoMethod::Chs(geometry)
         })
     }
 }
@@ -159,7 +159,7 @@ pub fn read_disk_sectors(
         let mut iter_count: i8;
 
         match disk.io_method {
-            LbaMethod => {
+            IoMethod::Lba => {
                 iter_count = cmp::min(loop_count, 127) as i8;
                 #[repr(C)]
                 struct DiskAccessPacket {
@@ -190,7 +190,7 @@ pub fn read_disk_sectors(
                 }
             },
 
-            ChsMethod(geometry) => {
+            IoMethod::Chs(geometry) => {
                 match convert_lba_to_chs(loop_sector, &geometry) {
                     Ok(chs) => {
                         // For maximum compatibility, avoid doing a read that

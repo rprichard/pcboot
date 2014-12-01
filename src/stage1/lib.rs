@@ -55,13 +55,16 @@ pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
     let mut offset = 0u;
 
     unsafe {
-        let file_size = fat32::read_file_reusing_buffer_in_find(&volume, "STAGE2  BIN", _stage2);
+        let file_size = fat32::read_file_reusing_buffer_in_find(&volume, "STAGE2  BIN", &mut _stage2);
         let checksum_offset = (file_size - 4) as uint;
-        let expected_checksum = io::get32(_stage2, checksum_offset);
+        let expected_checksum = io::get32(&_stage2, checksum_offset);
         let actual_checksum = crc32c::compute(&crc32c::table(), _stage2.slice_to(checksum_offset));
         println!("read {} bytes (crc32c:0x{:08x})", file_size, actual_checksum);
         if expected_checksum != actual_checksum {
-            io::print_str("pcboot error: bad checksum on stage2.bin!");
+            // TODO: Use the older, more complete error string.  Currently, it
+            // makes the stage1.bin binary too large.
+            //io::print_str("pcboot error: bad checksum on stage2.bin!");
+            io::print_str("bad checksum on stage2.bin!");
             lowlevel::halt();
         }
     }

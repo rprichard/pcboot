@@ -39,9 +39,10 @@ build/stage1/libcore.rlib : $(RUST_SRC_PATH)/libcore/lib.rs
 # unnecessary, because they use much less stack then the amount reserved for
 # non-Rust code, and it is conceivable that the stack overflow code could call
 # into here.
-build/stage1/librlibc.rlib : $(RUST_SRC_PATH)/librlibc/lib.rs build/stage1/libcore.rlib
+build/stage1/librlibc.rlib : src/shared/librlibc/lib.rs build/stage1/libcore.rlib
 	mkdir -p $(dir $@)
 	$(RUST_PROG) $(RUST_FLAGS) $< -o $@ --dep-info $@.d \
+		--crate-type rlib \
 		-C no-stack-check \
 		--extern core=build/stage1/libcore.rlib
 

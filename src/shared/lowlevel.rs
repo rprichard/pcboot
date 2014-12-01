@@ -29,8 +29,8 @@ extern fn stack_exhausted() {
     halt();
 }
 
-#[lang = "fail_fmt"]
-extern fn fail_fmt(msg: &::std::fmt::Arguments, file: &'static str, line: uint) -> ! {
+#[lang = "panic_fmt"]
+extern fn panic_fmt(msg: &::std::fmt::Arguments, file: &'static str, line: uint) -> ! {
     print!("{}:{}: internal error: {}", file, line, msg);
     halt();
 }

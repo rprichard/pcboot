@@ -29,7 +29,7 @@ pub fn table() -> Table {
 pub fn compute(table: &Table, buffer: &[u8]) -> u32 {
     let mut acc = 0xffffffff_u32;
     for b in buffer.iter() {
-        acc = table.data[(b ^ (acc as u8)) as uint] ^ (acc >> 8);
+        acc = table.data[(*b ^ (acc as u8)) as uint] ^ (acc >> 8);
     }
     acc ^ 0xffffffff
 }
