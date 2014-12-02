@@ -2,6 +2,7 @@ extern crate core;
 use core::prelude::*;
 use core::mem;
 use core::cmp;
+use num_to_str;
 
 extern "C" {
     fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
@@ -39,17 +40,9 @@ pub fn print_str(text: &str) {
     }
 }
 
-struct PrintWriter;
-
-impl core::fmt::FormatWriter for PrintWriter {
-    fn write(&mut self, buf: &[u8]) -> core::fmt::Result {
-        ::io::print_byte_str(buf);
-        Ok(())
-    }
-}
-
-pub fn print_args(args: &::std::fmt::Arguments) {
-    let _ = core::fmt::write(&mut PrintWriter, args);
+pub fn print_u32(val: u32) {
+    let mut storage = num_to_str::u32_zero;
+    print_str(num_to_str::u32(val as u32, &mut storage));
 }
 
 pub const SECTOR_SIZE: uint = 512;

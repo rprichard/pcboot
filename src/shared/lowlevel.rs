@@ -1,5 +1,7 @@
 extern crate core;
 use core::prelude::*;
+use io;
+use std;
 
 extern "C" {
     fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
@@ -25,12 +27,26 @@ extern fn eh_personality() {}
 
 #[lang = "stack_exhausted"]
 extern fn stack_exhausted() {
-    ::io::print_str("internal error: stack exhausted! halting!\r\n");
+    io::print_str("internal error: stack exhausted!");
     halt();
 }
 
-#[lang = "panic_fmt"]
-extern fn panic_fmt(msg: &::std::fmt::Arguments, file: &'static str, line: uint) -> ! {
-    print!("{}:{}: internal error: {}", file, line, msg);
+#[lang = "panic_fmt"] #[cold] #[inline(never)]
+extern fn rust_panic_fmt(msg: &std::fmt::Arguments, file: &'static str, line: uint) -> ! {
+    // For size optimization, avoid using the "msg" argument.  We build stage1
+    // with -C lto, which is apparently smart enough to figure out that msg is
+    // unused and remove the caller formatting code involved in creating "msg".
+    // This is a huge size savings (e.g. several kilobytes).
+    panic(file, line, "rust_panic_fmt", "")
+}
+
+pub fn panic(file: &'static str, line: uint, err1: &'static str, err2: &'static str) -> ! {
+    io::print_str("internal error: ");
+    io::print_str(file);
+    io::print_char(b':');
+    io::print_u32(line as u32);
+    io::print_str(": ");
+    io::print_str(err1);
+    io::print_str(err2);
     halt();
 }

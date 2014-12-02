@@ -177,8 +177,12 @@ impl<'a, 'b> ClusterIterator<'a, 'b> {
                     } else if next >= 0x0fff_fff8 {
                         None
                     } else {
-                        panic!("FAT entry for cluster 0x{:x} is bad (0x{:x})",
-                            cluster, next);
+                        io::print_str("FAT entry for cluster ");
+                        io::print_u32(cluster as u32);
+                        io::print_str(" is bad (");
+                        io::print_u32(next as u32);
+                        io::print_str(")");
+                        panic!();
                     }
                 };
                 Some(cluster)
@@ -373,7 +377,10 @@ pub fn read_file_reusing_buffer_in_find(
     let mut table = fat_table(volume);
     match find_file(volume, name, &mut table, buffer) {
         None => {
-            panic!("File '{}' missing from pcboot volume!", name);
+            io::print_str("Cannot find file '");
+            io::print_str(name);
+            io::print_str("' in pcboot volume!");
+            panic!();
         }
         Some(location) => {
             read_node_data(volume, location, buffer, &mut table);
