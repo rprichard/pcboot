@@ -22,6 +22,7 @@ RUST_FLAGS := \
 	--target i686-unknown-linux-gnu \
 	-C opt-level=s \
 	-C relocation-model=static \
+	-C target-cpu=i586 \
 	-C llvm-args=-rotation-max-header-size=0
 
 build/stage1/%.o : src/stage1/%.asm
