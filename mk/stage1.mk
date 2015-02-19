@@ -1,5 +1,3 @@
-# TODO: Use i386 instead of i686?
-
 ###############################################################################
 # Configurable Rust paths
 ###############################################################################
@@ -22,7 +20,7 @@ RUST_FLAGS := \
 	--target i686-unknown-linux-gnu \
 	-C opt-level=s \
 	-C relocation-model=static \
-	-C target-cpu=i586 \
+	-C target-cpu=i386 \
 	-C llvm-args=-rotation-max-header-size=0
 
 build/stage1/%.o : src/stage1/%.asm
