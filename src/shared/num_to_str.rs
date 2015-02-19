@@ -1,17 +1,17 @@
 extern crate core;
 use core::prelude::*;
 
-type u32_storage = [u8, ..10];
+type U32Storage = [u8; 10];
 
-pub const u32_zero: u32_storage = [0u8, ..10];
+pub const U32_ZERO: U32Storage = [0u8; 10];
 
-pub fn u32<'a>(mut val: u32, storage: &'a mut u32_storage) -> &'a str {
+pub fn u32<'a>(mut val: u32, storage: &'a mut U32Storage) -> &'a str {
     let mut first = storage.len() - 1;
     for i in range(0, storage.len()).rev() {
         let digit = val % 10;
         val /= 10;
         unsafe {
-            *storage.unsafe_mut(i) = b'0' + digit as u8;
+            *storage.get_unchecked_mut(i) = b'0' + digit as u8;
         }
         if digit != 0 {
             first = i;
@@ -20,7 +20,7 @@ pub fn u32<'a>(mut val: u32, storage: &'a mut u32_storage) -> &'a str {
     unsafe {
         let buf_slice = core::mem::transmute(
             core::raw::Slice {
-                data: storage.as_ptr().offset(first as int),
+                data: storage.as_ptr().offset(first as isize),
                 len: storage.len() - first,
             }
         );

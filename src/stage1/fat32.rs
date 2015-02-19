@@ -1,10 +1,10 @@
 use core;
-use core::iter;
 use core::num;
 use core::prelude::*;
 
 use io;
 
+#[allow(dead_code)]
 struct Fat32Volume<'a> {
     disk: &'a io::Disk,
     fsinfo_sec: u32,
@@ -18,12 +18,11 @@ struct Fat32Volume<'a> {
 }
 
 #[repr(C, packed)]
-#[allow(dead_code)]
 // The integer fields are little-endian on disk and in memory.
 struct Fat32VBR {
     // These fields are the same for all of FAT12, FAT16, and FAT32.
-    /*0*/   jmp: [u8, ..3],             // irrelevant
-    /*3*/   oem_name: [u8, ..8],        // irrelevant
+    /*0*/   jmp: [u8; 3],               // irrelevant
+    /*3*/   oem_name: [u8; 8],          // irrelevant
     /*11*/  bytes_per_sec: u16,         // XXX: Can this *really* be non-512?
     /*13*/  sec_per_clust: u8,          // useful
     /*14*/  reserved_sec_cnt: u16,      // useful
@@ -43,21 +42,21 @@ struct Fat32VBR {
     /*44*/  root_dir_clust: u32,        // useful - cluster # of root directory
     /*48*/  fsinfo_sec: u16,            // useful - sector # of fsinfo struct
     /*50*/  backup_vbr_sec: u16,        // useful - TODO: Is this backup in the reserved area?
-    /*52*/  _reserved: [u8, ..12],
+    /*52*/  _reserved: [u8; 12],
     /*64*/  drive_number: u8,           // nonsense (BIOS drive number, e.g. 0x80)
     /*65*/  winnt_flags: u8,            // ???
     /*66*/  signature: u8,              // backward-compat?  osdev says: must be 0x28 or 0x29
     /*67*/  serial_number: u32,         // useful
-    /*71*/  volume_label: [u8, ..11],   // useful, padded with spaces
-    /*82*/  fs_type: [u8, ..8],         // the string "FAT32   "
-    /*90*/  boot_code: [u8, ..420],     // irrelevant
+    /*71*/  volume_label: [u8; 11],     // useful, padded with spaces
+    /*82*/  fs_type: [u8; 8],           // the string "FAT32   "
+    /*90*/  boot_code: [u8; 420],       // irrelevant
     /*510*/ boot_signature: u16,        // 0xaa55
 }
 
 #[repr(C, packed)]
 #[allow(dead_code)]
 struct DirEntry {
-    /*0*/   name: [u8, ..11],           // 8.3 filename, padded with spaces
+    /*0*/   name: [u8; 11],             // 8.3 filename, padded with spaces
     /*11*/  attr: u8,                   // attributes
     /*12*/  winnt_reserved: u8,         // reserved for Windows NT
     // ctime == creation time, atime == last accessed, mtime == last modified
@@ -86,7 +85,7 @@ const ALL_FILE_ATTRIBUTES: u8 =
 pub fn open_volume<'a>(disk: &'a io::Disk, sector: io::SectorIndex) ->
         Fat32Volume<'a> {
     let vbr: Fat32VBR = {
-        let mut vbr_data = [0u8, ..512];
+        let mut vbr_data = [0u8; 512];
         io::read_disk_sectors(disk, sector, &mut vbr_data).unwrap();
         unsafe { core::mem::transmute(vbr_data) }
     };
@@ -119,12 +118,12 @@ pub fn open_volume<'a>(disk: &'a io::Disk, sector: io::SectorIndex) ->
     }
 }
 
-const FAT_TABLE_CACHE_SIZE: uint = 1024;
+const FAT_TABLE_CACHE_SIZE: usize = 1024;
 
 struct FatTable<'a> {
     volume: &'a Fat32Volume<'a>,
     cache_lba: Option<u32>,
-    cache_buffer: [u8, ..FAT_TABLE_CACHE_SIZE],
+    cache_buffer: [u8; FAT_TABLE_CACHE_SIZE],
 }
 
 impl<'a> FatTable<'a> {
@@ -146,7 +145,7 @@ impl<'a> FatTable<'a> {
                 self.volume.start_fat_sector + sector,
                 &mut self.cache_buffer).unwrap();
         }
-        io::get32(&self.cache_buffer, offset as uint)
+        io::get32(&self.cache_buffer, offset as usize)
     }
 }
 
@@ -154,7 +153,7 @@ fn fat_table<'a>(volume: &'a Fat32Volume<'a>) -> FatTable<'a> {
     FatTable {
         volume: volume,
         cache_lba: None,
-        cache_buffer: [0u8, ..FAT_TABLE_CACHE_SIZE]
+        cache_buffer: [0u8; FAT_TABLE_CACHE_SIZE]
     }
 }
 
@@ -243,6 +242,7 @@ struct FragmentIterator<'a, 'b:'a> {
     queued: Option<u32>,
 }
 
+#[derive(Copy)]
 struct Fragment {
     start_sector: u32,
     sector_count: u32,
@@ -267,7 +267,7 @@ impl<'a, 'b> FragmentIterator<'a, 'b> {
                     break;
                 },
                 Some(sector) => {
-                    if (sector == last_sector + 1) {
+                    if sector == last_sector + 1 {
                         last_sector = sector;
                     } else {
                         self.queued = Some(sector);
@@ -294,6 +294,7 @@ fn iterate_fragments<'a, 'b>(
     }
 }
 
+#[derive(Copy)]
 struct FileLocation {
     cluster: u32,
     size: u32,
@@ -309,11 +310,12 @@ fn find_file(
         fat_table, volume.root_dir_clust, tmp_buf.len() as u32 / 512);
     let mut fragment: Option<Fragment>;
     while { fragment = it.next(); fragment.is_some() } {
-        let read_buffer = tmp_buf.slice_to_mut(
-            (fragment.unwrap().sector_count * 512) as uint);
+        let fragment = fragment.unwrap();
+        let read_buffer_size = (fragment.sector_count * 512) as usize;
+        let read_buffer = &mut tmp_buf[0..read_buffer_size];
         io::read_disk_sectors(
             volume.disk,
-            fragment.unwrap().start_sector,
+            fragment.start_sector,
             read_buffer).unwrap();
 
         // Is there a safe/better way to do this?
@@ -354,16 +356,17 @@ fn read_node_data(
     let mut it = iterate_fragments(
         fat_table, location.cluster, 0xffff_ffff);
     let mut fragment: Option<Fragment>;
-    let mut offset = 0u32;
+    let mut offset = 0us;
     let cluster_bytes = volume.sec_per_clust as u32 * 512;
-    let full_size = round_up(location.size, cluster_bytes);
+    let full_size = round_up(location.size, cluster_bytes) as usize;
     while { fragment = it.next(); fragment.is_some() } {
-        let fragment_bytes = fragment.unwrap().sector_count * 512;
+        let fragment = fragment.unwrap();
+        let fragment_bytes = (fragment.sector_count * 512) as usize;
         assert!(offset + fragment_bytes <= full_size);
         io::read_disk_sectors(
             volume.disk,
-            fragment.unwrap().start_sector,
-            buffer.slice_mut(offset as uint, fragment_bytes as uint)).unwrap();
+            fragment.start_sector,
+            &mut buffer[offset .. offset + fragment_bytes]).unwrap();
         offset += fragment_bytes;
     }
     assert!(offset == full_size);

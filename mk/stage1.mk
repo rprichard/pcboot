@@ -20,9 +20,7 @@ RUST_PROG := LD_LIBRARY_PATH=$(RUST_PROG_PATH)/lib $(RUST_PROG_PATH)/bin/rustc
 
 RUST_FLAGS := \
 	--target i686-unknown-linux-gnu \
-	-O --opt-size \
-	-C no-vectorize-loops \
-	-C no-vectorize-slp \
+	-C opt-level=s \
 	-C relocation-model=static \
 	-C llvm-args=-rotation-max-header-size=0
 
@@ -40,7 +38,7 @@ build/stage1/libcore.rlib : $(RUST_SRC_PATH)/libcore/lib.rs
 	mkdir -p $(dir $@)
 	$(RUST_PROG) $(RUST_FLAGS) $< \
 		--out-dir build/stage1 \
-		--dep-info $@.d
+		--emit link,dep-info
 
 # Turn off stack checking for these simple byte-string functions.  It is
 # unnecessary, because they use much less stack then the amount reserved for
@@ -50,7 +48,7 @@ build/stage1/librlibc.rlib : src/shared/librlibc/lib.rs build/stage1/libcore.rli
 	mkdir -p $(dir $@)
 	$(RUST_PROG) $(RUST_FLAGS) $< \
 		--out-dir build/stage1 \
-		--dep-info $@.d \
+		--emit link,dep-info \
 		--crate-type rlib \
 		--crate-name rlibc \
 		-C no-stack-check \
@@ -58,9 +56,10 @@ build/stage1/librlibc.rlib : src/shared/librlibc/lib.rs build/stage1/libcore.rli
 
 build/stage1/libstage1.a : src/stage1/lib.rs build/stage1/libcore.rlib build/stage1/librlibc.rlib
 	mkdir -p $(dir $@)
-	$(RUST_PROG) $(RUST_FLAGS) --crate-type staticlib -C lto $< -o $@ --dep-info $@.d \
+	$(RUST_PROG) $(RUST_FLAGS) --crate-type staticlib -C lto $< --out-dir build/stage1 --emit link,dep-info \
 		--extern core=build/stage1/libcore.rlib \
-		--extern rlibc=build/stage1/librlibc.rlib
+		--extern rlibc=build/stage1/librlibc.rlib \
+		-L $(RUST_LIB_PATH)/lib/rustlib/i686-unknown-linux-gnu/lib
 
 STAGE1_OBJECTS := \
 	build/shared/entry.o \
@@ -84,3 +83,6 @@ build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
 
 -include $(STAGE1_OBJECTS:=.d)
+-include build/stage1/core.d
+-include build/stage1/rlibc.d
+-include build/stage1/stage1.d

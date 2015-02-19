@@ -24,7 +24,7 @@ pub fn print_char(ch: u8) {
 
 // Disable stack checking, because this function might be used during stack
 // overflow handling.
-#[no_stack_check] #[inline(never)]
+#[no_stack_check] #[inline(never)] #[allow(dead_code)]
 pub fn print_byte_str(text: &[u8]) {
     for ch in text.iter() {
         print_char(*ch);
@@ -41,11 +41,11 @@ pub fn print_str(text: &str) {
 }
 
 pub fn print_u32(val: u32) {
-    let mut storage = num_to_str::u32_zero;
+    let mut storage = num_to_str::U32_ZERO;
     print_str(num_to_str::u32(val as u32, &mut storage));
 }
 
-pub const SECTOR_SIZE: uint = 512;
+pub const SECTOR_SIZE: usize = 512;
 pub type SectorIndex = u32;
 
 // When describing disk geometry, each field is a count.
@@ -183,7 +183,7 @@ pub fn read_disk_sectors(
                 }
             },
 
-            IoMethod::Chs(geometry) => {
+            IoMethod::Chs(ref geometry) => {
                 match convert_lba_to_chs(loop_sector, &geometry) {
                     Ok(chs) => {
                         // For maximum compatibility, avoid doing a read that
@@ -217,7 +217,7 @@ pub fn read_disk_sectors(
     Ok(())
 }
 
-pub fn get32(buffer: &[u8], offset: uint) -> u32 {
+pub fn get32(buffer: &[u8], offset: usize) -> u32 {
     ((buffer[offset + 0] as u32) << 0) +
     ((buffer[offset + 1] as u32) << 8) +
     ((buffer[offset + 2] as u32) << 16) +

@@ -1,5 +1,4 @@
 extern crate core;
-use core::prelude::*;
 use io;
 use std;
 
@@ -32,15 +31,15 @@ extern fn stack_exhausted() {
 }
 
 #[lang = "panic_fmt"] #[cold] #[inline(never)]
-extern fn rust_panic_fmt(msg: &std::fmt::Arguments, file: &'static str, line: uint) -> ! {
-    // For size optimization, avoid using the "msg" argument.  We build stage1
-    // with -C lto, which is apparently smart enough to figure out that msg is
-    // unused and remove the caller formatting code involved in creating "msg".
-    // This is a huge size savings (e.g. several kilobytes).
+extern fn rust_panic_fmt(_msg: &std::fmt::Arguments, file: &'static str, line: usize) -> ! {
+    // For size optimization, avoid using the "_msg" argument.  We build stage1
+    // with -C lto, which is apparently smart enough to figure out that _msg is
+    // unused and remove the caller formatting code involved in creating
+    // "_msg".  This is a huge size savings (e.g. several kilobytes).
     panic(file, line, "rust_panic_fmt", "")
 }
 
-pub fn panic(file: &'static str, line: uint, err1: &'static str, err2: &'static str) -> ! {
+pub fn panic(file: &'static str, line: usize, err1: &'static str, err2: &'static str) -> ! {
     io::print_str("internal error: ");
     io::print_str(file);
     io::print_char(b':');
