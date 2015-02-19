@@ -2,19 +2,11 @@
 # Configurable Rust paths
 ###############################################################################
 
-# Path to Rust distribution (for the Rust compiler).
-#RUST_PROG_PATH := /home/rprichard/work/rust/x86_64-unknown-linux-gnu/stage1
-RUST_PROG_PATH := /home/rprichard/work/rust/out/rust-i686-unknown-linux-gnu
-
-# Path to Rust distribution (for Rust libraries).
-RUST_LIB_PATH := /home/rprichard/work/rust/out/rust-i686-unknown-linux-gnu
-
-# Path to Rust src directory (for compiling libcore and librlibc libraries).
-RUST_SRC_PATH := /home/rprichard/work/rust/src
+#RUST_PROG_DIR := /home/rprichard/work/rust/x86_64-unknown-linux-gnu/stage1
+RUST_PROG_DIR := /home/rprichard/work/rust/out/rust-i686-unknown-linux-gnu
+RUSTC := LD_LIBRARY_PATH=$(RUST_PROG_DIR)/lib $(RUST_PROG_DIR)/bin/rustc
 
 ###############################################################################
-
-RUST_PROG := LD_LIBRARY_PATH=$(RUST_PROG_PATH)/lib $(RUST_PROG_PATH)/bin/rustc
 
 RUST_FLAGS := \
 	--target i686-unknown-linux-gnu \
@@ -27,38 +19,22 @@ build/stage1/%.o : src/stage1/%.asm
 	mkdir -p $(dir $@)
 	nasm -felf32 $< -o $@ -MD $@.d
 
-# Passing -o to rustc to generate an rlib is currently broken.  Instead, we
-# must pass --out-dir.  If we pass "-o build/stage1/libcore.rlib" to rustc, it
-# will generate the correct file, but the entries inside the archive will then
-# have a lib prefix in their names, which breaks LTO.  See
-# https://github.com/rust-lang/rust/pull/13321.
-
-build/stage1/libcore.rlib : $(RUST_SRC_PATH)/libcore/lib.rs
-	mkdir -p $(dir $@)
-	$(RUST_PROG) $(RUST_FLAGS) $< \
-		--out-dir build/stage1 \
-		--emit link,dep-info
-
 # Turn off stack checking for these simple byte-string functions.  It is
 # unnecessary, because they use much less stack then the amount reserved for
 # non-Rust code, and it is conceivable that the stack overflow code could call
 # into here.
-build/stage1/librlibc.rlib : src/shared/librlibc/lib.rs build/stage1/libcore.rlib
+build/stage1/librlibc.rlib : src/shared/librlibc/lib.rs
 	mkdir -p $(dir $@)
-	$(RUST_PROG) $(RUST_FLAGS) $< \
+	$(RUSTC) $(RUST_FLAGS) $< \
 		--out-dir build/stage1 \
 		--emit link,dep-info \
 		--crate-type rlib \
 		--crate-name rlibc \
-		-C no-stack-check \
-		--extern core=build/stage1/libcore.rlib
+		-C no-stack-check
 
-build/stage1/libstage1.a : src/stage1/lib.rs build/stage1/libcore.rlib build/stage1/librlibc.rlib
+build/stage1/libstage1.a : src/stage1/lib.rs
 	mkdir -p $(dir $@)
-	$(RUST_PROG) $(RUST_FLAGS) --crate-type staticlib -C lto $< --out-dir build/stage1 --emit link,dep-info \
-		--extern core=build/stage1/libcore.rlib \
-		--extern rlibc=build/stage1/librlibc.rlib \
-		-L $(RUST_LIB_PATH)/lib/rustlib/i686-unknown-linux-gnu/lib
+	$(RUSTC) $(RUST_FLAGS) --crate-type staticlib -C lto $< --out-dir build/stage1 --emit link,dep-info
 
 STAGE1_OBJECTS := \
 	build/shared/entry.o \
@@ -67,7 +43,6 @@ STAGE1_OBJECTS := \
 	build/shared/io.o \
 	build/stage1/transfer.o \
 	build/stage1/libstage1.a \
-	build/stage1/libcore.rlib \
 	build/stage1/librlibc.rlib
 
 build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
@@ -82,6 +57,5 @@ build/stage1.bin : $(STAGE1_OBJECTS) src/stage1/stage1.ld
 FINAL_OUTPUTS := $(FINAL_OUTPUTS) build/stage1.bin
 
 -include $(STAGE1_OBJECTS:=.d)
--include build/stage1/core.d
 -include build/stage1/rlibc.d
 -include build/stage1/stage1.d
