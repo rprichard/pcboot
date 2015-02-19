@@ -5,8 +5,8 @@
 ###############################################################################
 
 # Path to Rust distribution (for the Rust compiler).
-RUST_PROG_PATH := /home/rprichard/work/rust/x86_64-unknown-linux-gnu/stage1
-#RUST_PROG_PATH := /home/rprichard/work/rust/out/rust-i686-unknown-linux-gnu
+#RUST_PROG_PATH := /home/rprichard/work/rust/x86_64-unknown-linux-gnu/stage1
+RUST_PROG_PATH := /home/rprichard/work/rust/out/rust-i686-unknown-linux-gnu
 
 # Path to Rust distribution (for Rust libraries).
 RUST_LIB_PATH := /home/rprichard/work/rust/out/rust-i686-unknown-linux-gnu
