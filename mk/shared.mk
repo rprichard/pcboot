@@ -21,6 +21,6 @@ SHARED_OBJECTS := \
 	build/shared/entry.o \
 	build/shared/mode_switch.o \
 	build/shared/lowlevel.o \
-	build/shared/io.o \
+	build/shared/io.o
 
 -include $(SHARED_OBJECTS:=.d)
