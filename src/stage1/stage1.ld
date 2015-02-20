@@ -70,6 +70,10 @@ SECTIONS
         _stage2_end = .;
         _stage2_size = _stage2_end - _stage2;
         _stage2_para_size = _stage2_size >> 4;
+
+        # When stage2 is moved, the src and dest regions overlap.  If the dest
+        # were greater than the src, the move direction would need to change.
+        ASSERT(_stage2_reloc <= _stage2 - 16, "stage2")
     }
 
     . = 0x7ff80;
