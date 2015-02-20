@@ -2,11 +2,11 @@ use core;
 use core::num;
 use core::prelude::*;
 
-use io;
+use sys;
 
 #[allow(dead_code)]
 struct Fat32Volume<'a> {
-    disk: &'a io::Disk,
+    disk: &'a sys::Disk,
     fsinfo_sec: u32,
     start_fat_sector: u32,
     start_data_sector: u32,
@@ -82,11 +82,11 @@ struct DirEntry {
 const ALL_FILE_ATTRIBUTES: u8 =
     ATTR_READ_ONLY | ATTR_HIDDEN | ATTR_SYSTEM | ATTR_ARCHIVE;
 
-pub fn open_volume<'a>(disk: &'a io::Disk, sector: io::SectorIndex) ->
+pub fn open_volume<'a>(disk: &'a sys::Disk, sector: sys::SectorIndex) ->
         Fat32Volume<'a> {
     let vbr: Fat32VBR = {
         let mut vbr_data = [0u8; 512];
-        io::read_disk_sectors(disk, sector, &mut vbr_data).unwrap();
+        sys::read_disk_sectors(disk, sector, &mut vbr_data).unwrap();
         unsafe { core::mem::transmute(vbr_data) }
     };
 
@@ -140,12 +140,12 @@ impl<'a> FatTable<'a> {
 
         if !cache_hit {
             self.cache_lba = Some(sector);
-            io::read_disk_sectors(
+            sys::read_disk_sectors(
                 self.volume.disk,
                 self.volume.start_fat_sector + sector,
                 &mut self.cache_buffer).unwrap();
         }
-        io::get32(&self.cache_buffer, offset as usize)
+        sys::get32(&self.cache_buffer, offset as usize)
     }
 }
 
@@ -176,11 +176,11 @@ impl<'a, 'b> ClusterIterator<'a, 'b> {
                     } else if next >= 0x0fff_fff8 {
                         None
                     } else {
-                        io::print_str("FAT entry for cluster ");
-                        io::print_u32(cluster as u32);
-                        io::print_str(" is bad (");
-                        io::print_u32(next as u32);
-                        io::print_str(")");
+                        sys::print_str("FAT entry for cluster ");
+                        sys::print_u32(cluster as u32);
+                        sys::print_str(" is bad (");
+                        sys::print_u32(next as u32);
+                        sys::print_str(")");
                         panic!();
                     }
                 };
@@ -313,7 +313,7 @@ fn find_file(
         let fragment = fragment.unwrap();
         let read_buffer_size = (fragment.sector_count * 512) as usize;
         let read_buffer = &mut tmp_buf[0..read_buffer_size];
-        io::read_disk_sectors(
+        sys::read_disk_sectors(
             volume.disk,
             fragment.start_sector,
             read_buffer).unwrap();
@@ -363,7 +363,7 @@ fn read_node_data(
         let fragment = fragment.unwrap();
         let fragment_bytes = (fragment.sector_count * 512) as usize;
         assert!(offset + fragment_bytes <= full_size);
-        io::read_disk_sectors(
+        sys::read_disk_sectors(
             volume.disk,
             fragment.start_sector,
             &mut buffer[offset .. offset + fragment_bytes]).unwrap();
@@ -380,9 +380,9 @@ pub fn read_file_reusing_buffer_in_find(
     let mut table = fat_table(volume);
     match find_file(volume, name, &mut table, buffer) {
         None => {
-            io::print_str("Cannot find file '");
-            io::print_str(name);
-            io::print_str("' in pcboot volume!");
+            sys::print_str("Cannot find file '");
+            sys::print_str(name);
+            sys::print_str("' in pcboot volume!");
             panic!();
         }
         Some(location) => {

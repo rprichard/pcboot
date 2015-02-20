@@ -1,16 +1,33 @@
+#![crate_name = "sys"]
+#![crate_type = "rlib"]
+#![feature(core, lang_items, no_std)]
+#![no_std]
+
 extern crate core;
 use core::prelude::*;
 use core::mem;
 use core::cmp;
-use num_to_str;
+
+pub mod num_to_str;
 
 extern "C" {
-    fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
+    pub fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
     fn print_char_16bit();
     fn check_for_int13_extensions();
     fn get_disk_geometry();
     fn read_disk_lba();
     fn read_disk_chs();
+    fn halt_16bit();
+}
+
+// Define a limited version of the assert! macro here for libsys' use only.
+// libsys must be usable from stage1, which lacks argument printing.
+macro_rules! assert {
+    ($cond:expr) => (
+        if !$cond {
+            simple_panic(file!(), line!(), "assert fail: ", stringify!($cond))
+        }
+    );
 }
 
 // Disable stack checking, because this function might be used during stack
@@ -24,7 +41,7 @@ pub fn print_char(ch: u8) {
 
 // Disable stack checking, because this function might be used during stack
 // overflow handling.
-#[no_stack_check] #[inline(never)] #[allow(dead_code)]
+#[no_stack_check] #[inline(never)]
 pub fn print_byte_str(text: &[u8]) {
     for ch in text.iter() {
         print_char(*ch);
@@ -51,13 +68,13 @@ pub type SectorIndex = u32;
 // When describing disk geometry, each field is a count.
 // When describing a sector index, each field is 0-based, including sector.
 #[repr(C)]
-struct Chs {
+pub struct Chs {
     cylinder: u16,
     head: u16,
     sector: u8,
 }
 
-enum IoMethod {
+pub enum IoMethod {
     Lba,
     Chs(Chs),
 }
@@ -97,7 +114,7 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
     }
 }
 
-fn convert_lba_to_chs(lba: SectorIndex, geometry: &Chs) ->
+pub fn convert_lba_to_chs(lba: SectorIndex, geometry: &Chs) ->
         Result<Chs, &'static str> {
     let lba_head = lba / geometry.sector as u32;
     let sector = lba % geometry.sector as u32;
@@ -113,7 +130,7 @@ fn convert_lba_to_chs(lba: SectorIndex, geometry: &Chs) ->
     })
 }
 
-fn addr_linear_to_segmented(linear: u32) -> u32 {
+pub fn addr_linear_to_segmented(linear: u32) -> u32 {
     // Ensure that the address if convertable to a 16-bit segment:offset far
     // pointer.  Memory past 0x80000 is reserved[1] anyway, so use that as the
     // limit for simplicity.
@@ -222,4 +239,38 @@ pub fn get32(buffer: &[u8], offset: usize) -> u32 {
     ((buffer[offset + 1] as u32) << 8) +
     ((buffer[offset + 2] as u32) << 16) +
     ((buffer[offset + 3] as u32) << 24)
+}
+
+// Add no_split_stack to disable stack checking.  This function is used during
+// stack overflow handling.
+#[no_stack_check]
+pub fn halt() -> ! {
+    unsafe {
+        call_real_mode(halt_16bit);
+
+        // Make the rustc compiler happy.  It thinks call_real_mode can return.
+        // Changing the declaration of call_real_mode is hard -- rust issue
+        // #12707.
+        loop {}
+    }
+}
+
+#[lang = "eh_personality"]
+extern fn eh_personality() {}
+
+#[lang = "stack_exhausted"]
+extern fn stack_exhausted() {
+    print_str("internal error: stack exhausted!");
+    halt();
+}
+
+pub fn simple_panic(file: &'static str, line: usize, err1: &'static str, err2: &'static str) -> ! {
+    print_str("internal error: ");
+    print_str(file);
+    print_char(b':');
+    print_u32(line as u32);
+    print_str(": ");
+    print_str(err1);
+    print_str(err2);
+    halt();
 }

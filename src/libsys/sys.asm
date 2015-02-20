@@ -38,7 +38,7 @@ check_for_int13_extensions:
         ;
         ; Arguments:
         ; [bp+0] disk: u8
-        ; [bp+4] geometry: far *mut io::Chs
+        ; [bp+4] geometry: far *mut sys::Chs
         ;
         ;    struct Chs {
         ;        cylinder: u16,
@@ -101,7 +101,7 @@ get_disk_geometry:
         ;
         ; Arguments:
         ; [bp+0] disk: u8
-        ; [bp+4] dap: io::DiskAccessPacket (16 bytes)
+        ; [bp+4] dap: sys::DiskAccessPacket (16 bytes)
         ;
         ; Return: 1 on success, 0 on failure
         ;
@@ -124,7 +124,7 @@ read_disk_lba:
         ;
         ; Arguments:
         ; [bp+0] disk: u8
-        ; [bp+4] sector: io::Chs (6 bytes)
+        ; [bp+4] sector: sys::Chs (6 bytes)
         ; [bp+12] count: i8
         ; [bp+16] buffer_offset: u16
         ; [bp+18] buffer_segment: u16
@@ -159,3 +159,15 @@ read_disk_chs:
 .fail:
         xor eax, eax
         ret
+
+
+        ;
+        ; halt_16bit.  Halts the CPU without affecting the interrupt state.
+        ;
+
+        global halt_16bit
+        bits 16
+halt_16bit:
+.loop:
+        hlt
+        jmp .loop

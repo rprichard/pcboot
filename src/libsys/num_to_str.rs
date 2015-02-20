@@ -1,7 +1,7 @@
 extern crate core;
 use core::prelude::*;
 
-type U32Storage = [u8; 10];
+pub type U32Storage = [u8; 10];
 
 pub const U32_ZERO: U32Storage = [0u8; 10];
 

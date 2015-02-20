@@ -2,18 +2,22 @@ build/stage1/%.o : src/stage1/%.asm
 	mkdir -p $(dir $@)
 	nasm -felf32 $< -o $@ -MD $@.d
 
-build/stage1/libstage1.a : src/stage1/lib.rs
+build/stage1/libstage1.a : src/stage1/lib.rs build/libsys.rlib
 	mkdir -p $(dir $@)
-	$(RUSTC) $(RUSTC_TARGET_FLAGS) --crate-type staticlib -C lto $< --out-dir build/stage1 --emit link,dep-info
+	$(RUSTC) $(RUSTC_TARGET_FLAGS) -C lto $< \
+		--out-dir build/stage1 \
+		--emit link,dep-info \
+		--extern sys=build/libsys.rlib
 
 STAGE1_OBJECTS := \
 	build/stage1/transfer.o
 
 STAGE1_INPUTS := \
-	$(SHARED_OBJECTS) \
+	build/entry/entry.o \
 	$(STAGE1_OBJECTS) \
 	build/stage1/libstage1.a \
-	build/shared/librlibc.rlib
+	build/libsys_native.a \
+	build/librlibc.rlib
 
 build/stage1.bin : $(STAGE1_INPUTS) src/stage1/stage1.ld
 	gold -static -nostdlib --nmagic --gc-sections \

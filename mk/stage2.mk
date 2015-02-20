@@ -4,15 +4,19 @@ build/stage2/%.o : src/stage2/%.asm
 
 build/stage2/libstage2.a : src/stage2/lib.rs
 	mkdir -p $(dir $@)
-	$(RUSTC) $(RUSTC_TARGET_FLAGS) --crate-type staticlib -C lto $< --out-dir build/stage2 --emit link,dep-info
+	$(RUSTC) $(RUSTC_TARGET_FLAGS) -C lto $< \
+		--out-dir build/stage2 \
+		--emit link,dep-info \
+		--extern sys=build/libsys.rlib
 
 STAGE2_OBJECTS :=
 
 STAGE2_INPUTS := \
-	$(SHARED_OBJECTS) \
+	build/entry/entry.o \
 	$(STAGE2_OBJECTS) \
 	build/stage2/libstage2.a \
-	build/shared/librlibc.rlib
+	build/libsys_native.a \
+	build/librlibc.rlib
 
 build/stage2.bin : $(STAGE2_INPUTS) src/stage2/stage2.ld
 	gold -static -nostdlib --nmagic --gc-sections \

@@ -1,15 +1,11 @@
 #![crate_name = "stage1"]
-#![crate_type = "rlib"]
-#![feature(lang_items)]
-#![feature(no_std)]
-#![feature(core)]
+#![crate_type = "staticlib"]
+#![feature(core, lang_items, no_std)]
 #![no_std]
 
 extern crate core;
+extern crate sys;
 use core::prelude::*;
-
-#[path = "../shared/macros.rs"] #[macro_use]
-mod macros;
 
 // Define a dummy std module that contains libcore's fmt module.  The std::fmt
 // module is needed to satisfy the std::fmt::Arguments reference created by the
@@ -19,12 +15,11 @@ mod std {
     pub use core::fmt;
 }
 
-#[path = "../shared/io.rs"]             mod io;
-#[path = "../shared/lowlevel.rs"]       mod lowlevel;
-#[path = "../shared/num_to_str.rs"]     mod num_to_str;
+#[macro_use] mod macros;
 
 mod crc32c;
 mod fat32;
+mod panic;
 
 const STAGE2_SIZE: usize = 0x73000;
 
@@ -35,7 +30,7 @@ extern {
 
 #[no_mangle]
 pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
-    io::print_str("pcboot loading...\r\n");
+    sys::print_str("pcboot loading...\r\n");
 
     unsafe {
         // Ideally, this check would be done at compile-time, but I do not know
@@ -45,32 +40,31 @@ pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
         assert!(linker_size == STAGE2_SIZE);
     }
 
-    let disk = io::open_disk(disk_number).unwrap();
-    let volume = fat32::open_volume(&disk, volume_lba as io::SectorIndex);
+    let disk = sys::open_disk(disk_number).unwrap();
+    let volume = fat32::open_volume(&disk, volume_lba as sys::SectorIndex);
 
     unsafe {
         let file_size = fat32::read_file_reusing_buffer_in_find(&volume, "STAGE2  BIN", &mut _stage2);
         let checksum_offset = (file_size - 4) as usize;
-        let expected_checksum = io::get32(&_stage2, checksum_offset);
+        let expected_checksum = sys::get32(&_stage2, checksum_offset);
         let actual_checksum = crc32c::compute(&crc32c::table(), &_stage2[..checksum_offset]);
 
-        io::print_str("read ");
-        io::print_u32(file_size);
-        io::print_str(" bytes (crc32c:");
-        io::print_u32(actual_checksum);
-        io::print_str(")\r\n");
+        sys::print_str("read ");
+        sys::print_u32(file_size);
+        sys::print_str(" bytes (crc32c:");
+        sys::print_u32(actual_checksum);
+        sys::print_str(")\r\n");
 
         if expected_checksum != actual_checksum {
-            io::print_str("pcboot error: bad checksum on stage2.bin!");
-            lowlevel::halt();
+            sys::print_str("pcboot error: bad checksum on stage2.bin!");
+            sys::halt();
         }
     }
 
     extern "C" {
-        fn call_real_mode(callee: unsafe extern "C" fn(), ...) -> u64;
         fn transfer_to_stage2();
     }
 
-    unsafe { call_real_mode(transfer_to_stage2, disk_number as u32, volume_lba); }
-    lowlevel::halt();
+    unsafe { sys::call_real_mode(transfer_to_stage2, disk_number as u32, volume_lba); }
+    sys::halt();
 }
