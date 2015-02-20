@@ -66,7 +66,7 @@ SECTIONS
     .stage2 : {
         _stage2 = .;
         _stage2_segment = . >> 4;
-        _stage2_reloc = 0x600;                  # Address to copy stage2 to.
+        _stage2_reloc = 0x5000;                 # Address to copy stage2 to.
         _stage2_reloc_segment = _stage2_reloc >> 4;
         . += 0x73000;
         _stage2_end = .;

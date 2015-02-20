@@ -1,9 +1,27 @@
+###############################################################################
+# Configurable Rust path
+###############################################################################
+
+RUSTC := \
+    LD_LIBRARY_PATH=/home/rprichard/work/rust-nightly-i686-unknown-linux-gnu/rustc/lib \
+                    /home/rprichard/work/rust-nightly-i686-unknown-linux-gnu/rustc/bin/rustc
+
+###############################################################################
+
+RUSTC_TARGET_FLAGS := \
+    --target i686-unknown-linux-gnu \
+    -C opt-level=2 \
+    -C relocation-model=static \
+    -C target-cpu=i386 \
+    -C llvm-args=-rotation-max-header-size=0
+
 default : all
 
 include mk/boot_records.mk
 include mk/shared.mk
 include mk/installer.mk
 include mk/stage1.mk
+include mk/stage2.mk
 
 all : $(FINAL_OUTPUTS)
 
