@@ -21,35 +21,35 @@ struct Fat32Volume<'a> {
 // The integer fields are little-endian on disk and in memory.
 struct Fat32VBR {
     // These fields are the same for all of FAT12, FAT16, and FAT32.
-    /*0*/   jmp: [u8; 3],               // irrelevant
-    /*3*/   oem_name: [u8; 8],          // irrelevant
+    /*0*/   jmp: [u8; 3],               // unneeded
+    /*3*/   oem_name: [u8; 8],          // unneeded
     /*11*/  bytes_per_sec: u16,         // XXX: Can this *really* be non-512?
-    /*13*/  sec_per_clust: u8,          // useful
-    /*14*/  reserved_sec_cnt: u16,      // useful
-    /*16*/  fat_count: u8,              // useful
+    /*13*/  sec_per_clust: u8,
+    /*14*/  reserved_sec_cnt: u16,
+    /*16*/  fat_count: u8,
     /*17*/  num_of_dir_entries: u16,    // XXX: Is this used with FAT32?
-    /*19*/  total_sectors_16: u16,      // useful (slightly redundant)
-    /*21*/  media_descriptor_type: u8,  // nonsense
-    /*22*/  sec_per_fat_16: u16,        // useful (FAT12/FAT16 only)
-    /*24*/  sec_per_track: u16,         // nonsense
-    /*26*/  num_heads: u16,             // nonsense
-    /*28*/  hidden_sec_cnt: u32,        // dubious
-    /*32*/  total_sectors_32: u32,      // useful (slightly redundant)
+    /*19*/  total_sectors_16: u16,
+    /*21*/  media_descriptor_type: u8,
+    /*22*/  sec_per_fat_16: u16,        // FAT12/FAT16 only
+    /*24*/  sec_per_track: u16,
+    /*26*/  num_heads: u16,
+    /*28*/  hidden_sec_cnt: u32,
+    /*32*/  total_sectors_32: u32,
     // These fields are FAT32-specific.
-    /*36*/  sec_per_fat_32: u32,        // useful
+    /*36*/  sec_per_fat_32: u32,
     /*40*/  flags: u16,                 // XXX: What flags are there?
     /*42*/  fat_version_number: u16,    // XXX: What version numbers are there?
-    /*44*/  root_dir_clust: u32,        // useful - cluster # of root directory
-    /*48*/  fsinfo_sec: u16,            // useful - sector # of fsinfo struct
-    /*50*/  backup_vbr_sec: u16,        // useful - TODO: Is this backup in the reserved area?
+    /*44*/  root_dir_clust: u32,        // cluster # of root directory
+    /*48*/  fsinfo_sec: u16,            // sector # of fsinfo struct (within reserved area)
+    /*50*/  backup_vbr_sec: u16,        // sector # of backup VBR (within reserved area)
     /*52*/  _reserved: [u8; 12],
-    /*64*/  drive_number: u8,           // nonsense (BIOS drive number, e.g. 0x80)
-    /*65*/  winnt_flags: u8,            // ???
+    /*64*/  drive_number: u8,
+    /*65*/  winnt_flags: u8,            // XXX: what is this?
     /*66*/  signature: u8,              // backward-compat?  osdev says: must be 0x28 or 0x29
-    /*67*/  serial_number: u32,         // useful
-    /*71*/  volume_label: [u8; 11],     // useful, padded with spaces
+    /*67*/  serial_number: u32,
+    /*71*/  volume_label: [u8; 11],     // padded with spaces
     /*82*/  fs_type: [u8; 8],           // the string "FAT32   "
-    /*90*/  boot_code: [u8; 420],       // irrelevant
+    /*90*/  boot_code: [u8; 420],
     /*510*/ boot_signature: u16,        // 0xaa55
 }
 
