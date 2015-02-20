@@ -1,5 +1,3 @@
-ENTRY(main);
-
 SECTIONS
 {
     ENTRY(_entry)
