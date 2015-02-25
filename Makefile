@@ -9,6 +9,7 @@ RUSTC := \
 ###############################################################################
 
 RUSTC_TARGET_FLAGS := \
+    --cfg strref \
     --target i686-unknown-linux-gnu \
     -C opt-level=2 \
     -C relocation-model=static \

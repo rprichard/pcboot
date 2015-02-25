@@ -176,11 +176,11 @@ impl<'a, 'b> ClusterIterator<'a, 'b> {
                     } else if next >= 0x0fff_fff8 {
                         None
                     } else {
-                        sys::print_str("FAT entry for cluster ");
+                        sys::print_str(&"FAT entry for cluster ");
                         sys::print_u32(cluster as u32);
-                        sys::print_str(" is bad (");
+                        sys::print_str(&" is bad (");
                         sys::print_u32(next as u32);
-                        sys::print_str(")");
+                        sys::print_str(&")");
                         panic!();
                     }
                 };
@@ -302,7 +302,7 @@ struct FileLocation {
 
 fn find_file(
     volume: &Fat32Volume,
-    name: &str,
+    name: sys::StrRef,
     fat_table: &mut FatTable,
     tmp_buf: &mut [u8]) -> Option<FileLocation>
 {
@@ -375,14 +375,14 @@ fn read_node_data(
 // Returns the size of the file returned.
 pub fn read_file_reusing_buffer_in_find(
         volume: &Fat32Volume,
-        name: &str,
+        name: sys::StrRef,
         buffer: &mut [u8]) -> u32 {
     let mut table = fat_table(volume);
     match find_file(volume, name, &mut table, buffer) {
         None => {
-            sys::print_str("Cannot find file '");
+            sys::print_str(strlit!("Cannot find file '"));
             sys::print_str(name);
-            sys::print_str("' in pcboot volume!");
+            sys::print_str(strlit!("' in pcboot volume!"));
             panic!();
         }
         Some(location) => {

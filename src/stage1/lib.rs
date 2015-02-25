@@ -4,7 +4,7 @@
 #![no_std]
 
 extern crate core;
-extern crate sys;
+#[macro_use] extern crate sys;
 use core::prelude::*;
 
 // Define a dummy std module that contains libcore's fmt module.  The std::fmt
@@ -30,7 +30,7 @@ extern {
 
 #[no_mangle]
 pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
-    sys::print_str("pcboot loading...\r\n");
+    sys::print_str(strlit!("pcboot loading...\r\n"));
 
     unsafe {
         // Ideally, this check would be done at compile-time, but I do not know
@@ -44,19 +44,19 @@ pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
     let volume = fat32::open_volume(&disk, volume_lba as sys::SectorIndex);
 
     unsafe {
-        let file_size = fat32::read_file_reusing_buffer_in_find(&volume, "STAGE2  BIN", &mut _stage2);
+        let file_size = fat32::read_file_reusing_buffer_in_find(&volume, strlit!("STAGE2  BIN"), &mut _stage2);
         let checksum_offset = (file_size - 4) as usize;
         let expected_checksum = sys::get32(&_stage2, checksum_offset);
         let actual_checksum = crc32c::compute(&crc32c::table(), &_stage2[..checksum_offset]);
 
-        sys::print_str("read ");
+        sys::print_str(strlit!("read "));
         sys::print_u32(file_size);
-        sys::print_str(" bytes (crc32c:");
+        sys::print_str(strlit!(" bytes (crc32c:"));
         sys::print_u32(actual_checksum);
-        sys::print_str(")\r\n");
+        sys::print_str(strlit!(")\r\n"));
 
         if expected_checksum != actual_checksum {
-            sys::print_str("pcboot error: bad checksum on stage2.bin!");
+            sys::print_str(strlit!("pcboot error: bad checksum on stage2.bin!"));
             sys::halt();
         }
     }

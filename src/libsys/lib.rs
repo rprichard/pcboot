@@ -8,6 +8,8 @@ use core::prelude::*;
 use core::mem;
 use core::cmp;
 
+#[macro_use] mod macros;
+
 pub mod num_to_str;
 
 extern "C" {
@@ -20,12 +22,28 @@ extern "C" {
     fn halt_16bit();
 }
 
+// Passing around a slice/string is inefficient -- it's basically a tuple of a
+// string pointer and length.  The compiler allocates that tuple statically,
+// then when it passes it to a function, it makes a per-invocation copy, then
+// also passes the address of the copy.  I *think* the compiler and/or ABI
+// should be optimized, but in any case, we can get the compiler to do the
+// efficient thing today using a reference to the str tuple.
+
+#[cfg(strref)] pub type StrLit = &'static &'static str;
+#[cfg(strref)] pub type StrRef<'a, 'b> = &'a &'b str;
+
+#[cfg(not(strref))] pub type StrLit = &'static str;
+#[cfg(not(strref))] pub type StrRef<'a> = &'a str;
+
 // Define a limited version of the assert! macro here for libsys' use only.
 // libsys must be usable from stage1, which lacks argument printing.
 macro_rules! assert {
     ($cond:expr) => (
         if !$cond {
-            simple_panic(file!(), line!(), "assert fail: ", stringify!($cond))
+            simple_panic(strlit!(file!()),
+                         line!(),
+                         strlit!("assert fail: "),
+                         strlit!(stringify!($cond)))
         }
     );
 }
@@ -42,7 +60,7 @@ pub fn print_char(ch: u8) {
 // Disable stack checking, because this function might be used during stack
 // overflow handling.
 #[no_stack_check] #[inline(never)]
-pub fn print_byte_str(text: &[u8]) {
+pub fn print_byte_str(text: &&[u8]) {
     for ch in text.iter() {
         print_char(*ch);
     }
@@ -51,7 +69,7 @@ pub fn print_byte_str(text: &[u8]) {
 // Disable stack checking, because this function might be used during stack
 // overflow handling.
 #[no_stack_check] #[inline(never)]
-pub fn print_str(text: &str) {
+pub fn print_str(text: StrRef) {
     for ch in text.as_bytes().iter() {
         print_char(*ch);
     }
@@ -59,7 +77,7 @@ pub fn print_str(text: &str) {
 
 pub fn print_u32(val: u32) {
     let mut storage = num_to_str::U32_ZERO;
-    print_str(num_to_str::u32(val as u32, &mut storage));
+    print_str(strref!(num_to_str::u32(val as u32, &mut storage)));
 }
 
 pub const SECTOR_SIZE: usize = 512;
@@ -84,7 +102,7 @@ pub struct Disk {
     io_method: IoMethod,
 }
 
-pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
+pub fn open_disk(bios_disk_number: u8) -> Result<Disk, StrLit> {
     let has_int13_extensions = unsafe {
         call_real_mode(
             check_for_int13_extensions,
@@ -104,7 +122,7 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
                     get_disk_geometry,
                     bios_disk_number as u32,
                     geometry_ptr) as u8 == 0 {
-                return Err("cannot read disk geometry");
+                return Err(strlit!("cannot read disk geometry"));
             }
         }
         Ok(Disk {
@@ -115,13 +133,13 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, &'static str> {
 }
 
 pub fn convert_lba_to_chs(lba: SectorIndex, geometry: &Chs) ->
-        Result<Chs, &'static str> {
+        Result<Chs, StrLit> {
     let lba_head = lba / geometry.sector as u32;
     let sector = lba % geometry.sector as u32;
     let cylinder = lba_head / geometry.head as u32;
     let head = lba_head % geometry.head as u32;
     if cylinder > 1023 {
-        return Err("sector's cylinder exceeds 1023")
+        return Err(strlit!("sector's cylinder exceeds 1023"));
     }
     Ok(Chs {
         cylinder: cylinder as u16,
@@ -145,7 +163,7 @@ pub fn read_disk_sectors(
         disk: &Disk,
         start_sector: SectorIndex,
         buffer: &mut [u8]) ->
-        Result<(), &'static str> {
+        Result<(), StrLit> {
 
     // Only allow reads of integral count of sectors.
     assert!(buffer.len() % SECTOR_SIZE == 0);
@@ -195,7 +213,7 @@ pub fn read_disk_sectors(
                             read_disk_lba,
                             disk.bios_number as u32,
                             dap) as u8 == 0 {
-                        return Err("disk read error");
+                        return Err(strlit!("disk read error"));
                     }
                 }
             },
@@ -217,7 +235,7 @@ pub fn read_disk_sectors(
                                     iter_count as u32,
                                     addr_linear_to_segmented(loop_buffer))
                                     as u8 == 0 {
-                                return Err("disk read error");
+                                return Err(strlit!("disk read error"));
                             }
                         }
                     },
@@ -260,17 +278,21 @@ extern fn eh_personality() {}
 
 #[lang = "stack_exhausted"]
 extern fn stack_exhausted() {
-    print_str("internal error: stack exhausted!");
+    print_str(strlit!("internal error: stack exhausted!"));
     halt();
 }
 
-pub fn simple_panic(file: &'static str, line: u32, err1: &'static str, err2: &'static str) -> ! {
-    print_str("internal error: ");
+pub fn simple_panic(file: StrRef, line: u32, err1: StrRef, err2: StrRef) -> ! {
+    print_str(strlit!("internal error: "));
     print_str(file);
     print_char(b':');
     print_u32(line);
-    print_str(": ");
+    print_str(strlit!(": "));
     print_str(err1);
     print_str(err2);
     halt();
+}
+
+mod sys {
+    pub use StrLit;
 }
