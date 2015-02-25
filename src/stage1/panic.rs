@@ -10,5 +10,5 @@ extern fn rust_panic_fmt(_msg: &std::fmt::Arguments, file: &'static str, line: u
     // with -C lto, which is apparently smart enough to figure out that _msg is
     // unused and remove the caller formatting code involved in creating
     // "_msg".  This is a huge size savings (e.g. several kilobytes).
-    sys::simple_panic(file, line, "rust_panic_fmt", "")
+    sys::simple_panic(file, line as u32, "rust_panic_fmt", "")
 }

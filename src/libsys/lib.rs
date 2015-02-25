@@ -264,11 +264,11 @@ extern fn stack_exhausted() {
     halt();
 }
 
-pub fn simple_panic(file: &'static str, line: usize, err1: &'static str, err2: &'static str) -> ! {
+pub fn simple_panic(file: &'static str, line: u32, err1: &'static str, err2: &'static str) -> ! {
     print_str("internal error: ");
     print_str(file);
     print_char(b':');
-    print_u32(line as u32);
+    print_u32(line);
     print_str(": ");
     print_str(err1);
     print_str(err2);

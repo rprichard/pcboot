@@ -19,7 +19,7 @@ mod std {
 #[lang = "panic_fmt"] #[cold] #[inline(never)]
 extern fn rust_panic_fmt(_msg: std::fmt::Arguments, file: &'static str, line: usize) -> ! {
     // TODO: Replace this with a full argument-printing panic function.
-    sys::simple_panic(file, line, "rust_panic_fmt", "")
+    sys::simple_panic(file, line as u32, "rust_panic_fmt", "")
 }
 
 #[no_mangle]
