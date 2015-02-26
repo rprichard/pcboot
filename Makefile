@@ -2,16 +2,19 @@
 # Configurable Rust path
 ###############################################################################
 
-RUSTC := \
-    LD_LIBRARY_PATH=/home/rprichard/work/rust-nightly-i686-unknown-linux-gnu/rustc/lib \
-                    /home/rprichard/work/rust-nightly-i686-unknown-linux-gnu/rustc/bin/rustc
+RUSTC := fixld /home/rprichard/work/rust-tiny-panic/build/x86_64-unknown-linux-gnu/stage1/bin/rustc
+RUST_LIBCORE_SRC := /home/rprichard/work/rust-tiny-panic/src/libcore
 
 ###############################################################################
 
+RUST_LIBCORE_DEP := build/libcore.rlib
+RUST_LIBCORE_EXTERN := --extern core=$(RUST_LIBCORE_DEP)
+
 RUSTC_TARGET_FLAGS := \
+    -L build \
     --cfg strref \
     --target i686-unknown-linux-gnu \
-    -C opt-level=2 \
+    -C size-opt-level=2 \
     -C relocation-model=static \
     -C target-cpu=i386 \
     -C llvm-args=-rotation-max-header-size=0
@@ -21,6 +24,7 @@ default : all
 include mk/boot_records.mk
 include mk/entry.mk
 include mk/installer.mk
+include mk/libcore.mk
 include mk/librlibc.mk
 include mk/libsys.mk
 include mk/stage1.mk

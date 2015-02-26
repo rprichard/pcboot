@@ -2,9 +2,9 @@ build/libsys/%.o : src/libsys/%.asm
 	mkdir -p $(dir $@)
 	nasm -felf32 $< -o $@ -MD $@.d
 
-build/libsys.rlib : src/libsys/lib.rs
+build/libsys.rlib : src/libsys/lib.rs $(RUST_LIBCORE_DEP)
 	mkdir -p $(dir $@)
-	$(RUSTC) $(RUSTC_TARGET_FLAGS) $< --out-dir $(dir $@) --emit link,dep-info
+	$(RUSTC) $(RUSTC_TARGET_FLAGS) $(RUST_LIBCORE_EXTERN) $< --out-dir $(dir $@) --emit link,dep-info
 
 OBJECT_FILES := \
 	build/libsys/mode_switch.o \

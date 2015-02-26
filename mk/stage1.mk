@@ -2,12 +2,11 @@ build/stage1/%.o : src/stage1/%.asm
 	mkdir -p $(dir $@)
 	nasm -felf32 $< -o $@ -MD $@.d
 
-build/stage1/libstage1.a : src/stage1/lib.rs build/libsys.rlib
+build/stage1/libstage1.a : src/stage1/lib.rs build/libsys.rlib $(RUST_LIBCORE_DEP)
 	mkdir -p $(dir $@)
-	$(RUSTC) $(RUSTC_TARGET_FLAGS) -C lto $< \
+	$(RUSTC) $(RUSTC_TARGET_FLAGS) $(RUST_LIBCORE_EXTERN) -C lto $< \
 		--out-dir build/stage1 \
-		--emit link,dep-info \
-		--extern sys=build/libsys.rlib
+		--emit link,dep-info
 
 STAGE1_OBJECTS := \
 	build/stage1/transfer.o
