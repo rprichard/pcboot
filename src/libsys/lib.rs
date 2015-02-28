@@ -7,6 +7,7 @@ extern crate core;
 use core::prelude::*;
 use core::mem;
 use core::cmp;
+use core::fmt;
 
 #[macro_use] mod macros;
 
@@ -102,7 +103,32 @@ pub struct Disk {
     io_method: IoMethod,
 }
 
-pub fn open_disk(bios_disk_number: u8) -> Result<Disk, StrLit> {
+// TODO: Can we change this to an enum?  What's the representation overhead of
+// a single-item enum?
+pub struct ErrorStr {
+    msg: StrLit
+}
+
+impl ErrorStr {
+    #[inline]
+    pub fn new(msg: StrLit) -> ErrorStr {
+        ErrorStr { msg: msg }
+    }
+}
+
+impl fmt::Display for ErrorStr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.msg)
+    }
+}
+
+impl fmt::Debug for ErrorStr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.msg)
+    }
+}
+
+pub fn open_disk(bios_disk_number: u8) -> Result<Disk, ErrorStr> {
     let has_int13_extensions = unsafe {
         call_real_mode(
             check_for_int13_extensions,
@@ -122,7 +148,7 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, StrLit> {
                     get_disk_geometry,
                     bios_disk_number as u32,
                     geometry_ptr) as u8 == 0 {
-                return Err(strlit!("cannot read disk geometry"));
+                return Err(ErrorStr::new(strlit!("cannot read disk geometry")));
             }
         }
         Ok(Disk {
@@ -133,13 +159,13 @@ pub fn open_disk(bios_disk_number: u8) -> Result<Disk, StrLit> {
 }
 
 pub fn convert_lba_to_chs(lba: SectorIndex, geometry: &Chs) ->
-        Result<Chs, StrLit> {
+        Result<Chs, ErrorStr> {
     let lba_head = lba / geometry.sector as u32;
     let sector = lba % geometry.sector as u32;
     let cylinder = lba_head / geometry.head as u32;
     let head = lba_head % geometry.head as u32;
     if cylinder > 1023 {
-        return Err(strlit!("sector's cylinder exceeds 1023"));
+        return Err(ErrorStr::new(strlit!("sector's cylinder exceeds 1023")));
     }
     Ok(Chs {
         cylinder: cylinder as u16,
@@ -163,7 +189,7 @@ pub fn read_disk_sectors(
         disk: &Disk,
         start_sector: SectorIndex,
         buffer: &mut [u8]) ->
-        Result<(), StrLit> {
+        Result<(), ErrorStr> {
 
     // Only allow reads of integral count of sectors.
     assert!(buffer.len() % SECTOR_SIZE == 0);
@@ -213,7 +239,7 @@ pub fn read_disk_sectors(
                             read_disk_lba,
                             disk.bios_number as u32,
                             dap) as u8 == 0 {
-                        return Err(strlit!("disk read error"));
+                        return Err(ErrorStr::new(strlit!("disk read error")));
                     }
                 }
             },
@@ -235,7 +261,7 @@ pub fn read_disk_sectors(
                                     iter_count as u32,
                                     addr_linear_to_segmented(loop_buffer))
                                     as u8 == 0 {
-                                return Err(strlit!("disk read error"));
+                                return Err(ErrorStr::new(strlit!("disk read error")));
                             }
                         }
                     },
