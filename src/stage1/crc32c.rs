@@ -11,8 +11,8 @@ pub fn table() -> Table {
     //  - CRC-32C (Castagnoli) uses 0x1EDC6F41, reversed to 0x82F63B78.
     let polynomial = 0x82F63B78_u32;
     let mut table = Table { data: [0u32; 256] };
-    for i in range(0_u32, 256) {
-        let mut result = i;
+    for (i, cell) in table.data.iter_mut().enumerate() {
+        let mut result = i as u32;
         for _ in range(0, 8) {
             let lsb = result & 1;
             result >>= 1;
@@ -20,7 +20,7 @@ pub fn table() -> Table {
                 result ^= polynomial;
             }
         }
-        table.data[i as usize] = result;
+        *cell = result;
     }
     table
 }
@@ -28,7 +28,11 @@ pub fn table() -> Table {
 pub fn compute(table: &Table, buffer: &[u8]) -> u32 {
     let mut acc = 0xffffffff_u32;
     for b in buffer.iter() {
-        acc = table.data[(*b ^ (acc as u8)) as usize] ^ (acc >> 8);
+        let lookup_value = unsafe {
+            let index: u8 = *b ^ (acc as u8);
+            *table.data.get_unchecked(index as usize)
+        };
+        acc = lookup_value ^ (acc >> 8);
     }
     acc ^ 0xffffffff
 }

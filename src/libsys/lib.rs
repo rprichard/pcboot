@@ -279,10 +279,11 @@ pub fn read_disk_sectors(
 }
 
 pub fn get32(buffer: &[u8], offset: usize) -> u32 {
-    ((buffer[offset + 0] as u32) << 0) +
-    ((buffer[offset + 1] as u32) << 8) +
-    ((buffer[offset + 2] as u32) << 16) +
-    ((buffer[offset + 3] as u32) << 24)
+    let buffer = buffer;
+    assert!(offset < offset + 4 && offset + 4 <= buffer.len());
+    unsafe {
+        *(buffer.get_unchecked(offset) as *const u8 as *const u32)
+    }
 }
 
 // Add no_split_stack to disable stack checking.  This function is used during
