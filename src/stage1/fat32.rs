@@ -5,7 +5,7 @@ use core::prelude::*;
 use sys;
 
 #[allow(dead_code)]
-struct Fat32Volume<'a> {
+pub struct Fat32Volume<'a> {
     disk: &'a sys::Disk,
     fsinfo_sec: u32,
     start_fat_sector: u32,
@@ -344,7 +344,7 @@ fn find_file(
     None
 }
 
-fn round_up<T: num::UnsignedInt>(base: T, multiplier: T) -> T {
+fn round_up<T: num::Int>(base: T, multiplier: T) -> T {
     (base + multiplier - num::Int::one()) / multiplier * multiplier
 }
 
@@ -356,7 +356,7 @@ fn read_node_data(
     let mut it = iterate_fragments(
         fat_table, location.cluster, 0xffff_ffff);
     let mut fragment: Option<Fragment>;
-    let mut offset = 0us;
+    let mut offset = 0_usize;
     let cluster_bytes = volume.sec_per_clust as u32 * 512;
     let full_size = round_up(location.size, cluster_bytes) as usize;
     while { fragment = it.next(); fragment.is_some() } {

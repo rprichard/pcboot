@@ -1,7 +1,7 @@
 use core::prelude::*;
 
 // A 1KiB-sized table used to compute the checksum.
-struct Table {
+pub struct Table {
     data: [u32; 256]
 }
 
@@ -13,7 +13,7 @@ pub fn table() -> Table {
     let mut table = Table { data: [0u32; 256] };
     for (i, cell) in table.data.iter_mut().enumerate() {
         let mut result = i as u32;
-        for _ in range(0, 8) {
+        for _ in 0..8 {
             let lsb = result & 1;
             result >>= 1;
             if lsb == 1 {

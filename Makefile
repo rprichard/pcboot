@@ -2,8 +2,8 @@
 # Configurable Rust path
 ###############################################################################
 
-RUSTC := fixld /home/rprichard/work/rust-tiny-panic/build/x86_64-unknown-linux-gnu/stage1/bin/rustc
-RUST_LIBCORE_SRC := /home/rprichard/work/rust-tiny-panic/src/libcore
+RUSTC := fixld /home/rprichard/work/rust/build/install/bin/rustc
+RUST_LIBCORE_SRC := /home/rprichard/work/rust/src/libcore
 
 ###############################################################################
 
@@ -14,7 +14,7 @@ RUSTC_TARGET_FLAGS := \
     -L build \
     --cfg strref \
     --target i686-unknown-linux-gnu \
-    -C size-opt-level=2 \
+    -C opt-level=1 \
     -C relocation-model=static \
     -C target-cpu=i386 \
     -C llvm-args=-rotation-max-header-size=0
