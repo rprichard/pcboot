@@ -6,6 +6,7 @@
 extern crate core;
 #[macro_use] extern crate sys;
 use core::prelude::*;
+use core::cell::UnsafeCell;
 
 // Define a dummy std module that contains libcore's fmt module.  The std::fmt
 // module is needed to satisfy the std::fmt::Arguments reference created by the
@@ -24,30 +25,29 @@ mod panic;
 const STAGE2_SIZE: usize = 0x73000;
 
 extern {
-    static mut _stage2: [u8; STAGE2_SIZE];
-    static mut _stage2_end: [u8; 0];
+    static _stage2: UnsafeCell<[u8; STAGE2_SIZE]>;
+    static _stage2_end: UnsafeCell<[u8; 0]>;
 }
 
 #[no_mangle]
 pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
     sys::print_str(strlit!("pcboot loading...\r\n"));
 
-    unsafe {
-        // Ideally, this check would be done at compile-time, but I do not know
-        // whether that is possible.
-        let linker_size =
-            _stage2_end.as_ptr() as usize - _stage2.as_ptr() as usize;
-        assert!(linker_size == STAGE2_SIZE);
-    }
+    // Ideally, this check would be done at compile-time, but I do not know
+    // whether that is possible.
+    let linker_size =
+        _stage2_end.get() as usize - _stage2.get() as usize;
+    assert!(linker_size == STAGE2_SIZE);
 
     let disk = sys::open_disk(disk_number).unwrap();
     let volume = fat32::open_volume(&disk, volume_lba as sys::SectorIndex);
 
     unsafe {
-        let file_size = fat32::read_file_reusing_buffer_in_find(&volume, strlit!("STAGE2  BIN"), &mut _stage2);
+        let stage2 = &mut *_stage2.get();
+        let file_size = fat32::read_file_reusing_buffer_in_find(&volume, strlit!("STAGE2  BIN"), stage2);
         let checksum_offset = (file_size - 4) as usize;
-        let expected_checksum = sys::get32(&_stage2, checksum_offset);
-        let actual_checksum = crc32c::compute(&crc32c::table(), &_stage2[..checksum_offset]);
+        let expected_checksum = sys::get32(stage2, checksum_offset);
+        let actual_checksum = crc32c::compute(&crc32c::table(), &stage2[..checksum_offset]);
 
         sys::print_str(strlit!("read "));
         sys::print_u32(file_size);
