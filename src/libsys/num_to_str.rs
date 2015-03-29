@@ -7,7 +7,7 @@ pub const U32_ZERO: U32Storage = [0u8; 10];
 
 pub fn u32<'a>(mut val: u32, storage: &'a mut U32Storage) -> &'a str {
     let mut first = storage.len() - 1;
-    for i in range(0, storage.len()).rev() {
+    for i in (0..storage.len()).rev() {
         let digit = val % 10;
         val /= 10;
         unsafe {
