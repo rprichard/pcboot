@@ -17,7 +17,8 @@ RUSTC_TARGET_FLAGS := \
     -C opt-level=1 \
     -C relocation-model=static \
     -C target-cpu=i386 \
-    -C llvm-args=-rotation-max-header-size=0
+    -C llvm-args=-rotation-max-header-size=0 \
+    -Z no-landing-pads
 
 default : all
 
