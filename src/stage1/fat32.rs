@@ -1,5 +1,4 @@
 use core;
-use core::num;
 use core::prelude::*;
 
 use sys;
@@ -242,7 +241,7 @@ struct FragmentIterator<'a, 'b:'a> {
     queued: Option<u32>,
 }
 
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 struct Fragment {
     start_sector: u32,
     sector_count: u32,
@@ -294,7 +293,7 @@ fn iterate_fragments<'a, 'b>(
     }
 }
 
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 struct FileLocation {
     cluster: u32,
     size: u32,
@@ -344,8 +343,8 @@ fn find_file(
     None
 }
 
-fn round_up<T: num::Int>(base: T, multiplier: T) -> T {
-    (base + multiplier - num::Int::one()) / multiplier * multiplier
+fn round_up(base: u32, multiplier: u32) -> u32 {
+    (base + multiplier - 1) / multiplier * multiplier
 }
 
 fn read_node_data(

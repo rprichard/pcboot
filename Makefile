@@ -2,7 +2,7 @@
 # Configurable Rust path
 ###############################################################################
 
-RUSTC := fixld /home/rprichard/work/rust/build/install/bin/rustc
+RUSTC := rustn32
 RUST_LIBCORE_SRC := /home/rprichard/work/rust/src/libcore
 
 ###############################################################################
@@ -14,7 +14,7 @@ RUSTC_TARGET_FLAGS := \
     -L build \
     --cfg strref \
     --target i686-unknown-linux-gnu \
-    -C opt-level=1 \
+    -C opt-level=2 \
     -C relocation-model=static \
     -C target-cpu=i386 \
     -C llvm-args=-rotation-max-header-size=0 \

@@ -1,6 +1,6 @@
 #![crate_name = "sys"]
 #![crate_type = "rlib"]
-#![feature(core, lang_items, no_std)]
+#![feature(core, core_prelude, core_slice_ext, core_str_ext, lang_items, no_std, raw)]
 #![no_std]
 
 extern crate core;
