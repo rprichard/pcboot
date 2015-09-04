@@ -1,10 +1,8 @@
 #![crate_name = "sys"]
 #![crate_type = "rlib"]
-#![feature(core, core_prelude, core_slice_ext, core_str_ext, lang_items, no_std, raw)]
+#![feature(core, core_slice_ext, core_str_ext, lang_items, no_std, raw)]
 #![no_std]
 
-extern crate core;
-use core::prelude::*;
 use core::mem;
 use core::cmp;
 use core::fmt;
@@ -49,27 +47,21 @@ macro_rules! assert {
     );
 }
 
-// Disable stack checking, because this function might be used during stack
-// overflow handling.
-#[no_stack_check] #[inline(never)]
+#[inline(never)]
 pub fn print_char(ch: u8) {
     unsafe {
         call_real_mode(print_char_16bit, ch as u32);
     }
 }
 
-// Disable stack checking, because this function might be used during stack
-// overflow handling.
-#[no_stack_check] #[inline(never)]
+#[inline(never)]
 pub fn print_byte_str(text: &&[u8]) {
     for ch in text.iter() {
         print_char(*ch);
     }
 }
 
-// Disable stack checking, because this function might be used during stack
-// overflow handling.
-#[no_stack_check] #[inline(never)]
+#[inline(never)]
 pub fn print_str(text: StrRef) {
     for ch in text.as_bytes().iter() {
         print_char(*ch);
@@ -210,7 +202,7 @@ pub fn read_disk_sectors(
     let _ = addr_linear_to_segmented(loop_buffer + buffer.len() as u32);
 
     while loop_count > 0 {
-        let mut iter_count: i8;
+        let iter_count: i8;
 
         match disk.io_method {
             IoMethod::Lba => {
@@ -286,9 +278,6 @@ pub fn get32(buffer: &[u8], offset: usize) -> u32 {
     }
 }
 
-// Add no_split_stack to disable stack checking.  This function is used during
-// stack overflow handling.
-#[no_stack_check]
 pub fn halt() -> ! {
     unsafe {
         call_real_mode(halt_16bit);
@@ -303,11 +292,13 @@ pub fn halt() -> ! {
 #[lang = "eh_personality"]
 extern fn eh_personality() {}
 
-#[lang = "stack_exhausted"]
-extern fn stack_exhausted() {
-    print_str(strlit!("internal error: stack exhausted!"));
-    halt();
-}
+// TODO: I *think* stack checking was changed to use a guard page and stack
+// probes, which is not implemented in this boot loader.
+// #[lang = "stack_exhausted"]
+// extern fn stack_exhausted() {
+//     print_str(strlit!("internal error: stack exhausted!"));
+//     halt();
+// }
 
 pub fn simple_panic(file: StrRef, line: u32, err1: StrRef, err2: StrRef) -> ! {
     print_str(strlit!("internal error: "));

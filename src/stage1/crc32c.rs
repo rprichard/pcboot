@@ -1,5 +1,3 @@
-use core::prelude::*;
-
 // A 1KiB-sized table used to compute the checksum.
 pub struct Table {
     data: [u32; 256]

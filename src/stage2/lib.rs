@@ -2,10 +2,8 @@
 #![crate_type = "staticlib"]
 #![feature(lang_items)]
 #![feature(no_std)]
-#![feature(core)]
 #![no_std]
 
-#[macro_use] extern crate core;
 #[macro_use] extern crate sys;
 
 // Define a dummy std module that contains libcore's fmt module.  The std::fmt
@@ -23,7 +21,7 @@ extern fn rust_panic_fmt(_msg: std::fmt::Arguments, file: &'static str, line: us
 }
 
 #[no_mangle]
-pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
+pub extern "C" fn pcboot_main(_disk_number: u8, _volume_lba: u32) -> ! {
     sys::print_str(strlit!("pcboot stage2 loading...\r\n"));
     sys::halt();
 }

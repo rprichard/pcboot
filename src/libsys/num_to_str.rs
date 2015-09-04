@@ -1,5 +1,4 @@
-extern crate core;
-use core::prelude::*;
+use core;
 
 pub type U32Storage = [u8; 10];
 

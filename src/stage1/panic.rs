@@ -1,6 +1,5 @@
 use sys;
 use core::fmt;
-use core::prelude::*;
 
 pub struct SimpleWriter;
 impl fmt::Write for SimpleWriter {

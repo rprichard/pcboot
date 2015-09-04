@@ -1,5 +1,4 @@
 use core;
-use core::prelude::*;
 
 use sys;
 

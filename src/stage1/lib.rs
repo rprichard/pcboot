@@ -1,11 +1,9 @@
 #![crate_name = "stage1"]
 #![crate_type = "staticlib"]
-#![feature(core, core_prelude, core_slice_ext, core_str_ext, lang_items, no_std, raw)]
+#![feature(core, core_slice_ext, core_str_ext, lang_items, no_std, raw)]
 #![no_std]
 
-extern crate core;
 #[macro_use] extern crate sys;
-use core::prelude::*;
 use core::cell::UnsafeCell;
 
 // Define a dummy std module that contains libcore's fmt module.  The std::fmt
@@ -24,6 +22,7 @@ mod panic;
 
 const STAGE2_SIZE: usize = 0x73000;
 
+#[allow(improper_ctypes)]
 extern {
     static _stage2: UnsafeCell<[u8; STAGE2_SIZE]>;
     static _stage2_end: UnsafeCell<[u8; 0]>;
