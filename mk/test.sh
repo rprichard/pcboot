@@ -38,7 +38,7 @@ unit: sectors
     disk6 : start=     1200, size=       90, Id=83
     disk7 : start=     2048, size=   129024, Id=1c
 EOF
-sfdisk -q --no-reread --force -C64 -H64 -S32 test/disk < test/disk.setup.1
+sfdisk -q --no-reread --force test/disk < test/disk.setup.1
 echo SUCCESS
 
 # Install the MBR and volume.

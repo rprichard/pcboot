@@ -1,6 +1,6 @@
 #![crate_name = "sys"]
 #![crate_type = "rlib"]
-#![feature(core, core_slice_ext, core_str_ext, lang_items, no_std, raw)]
+#![feature(lang_items)]
 #![no_std]
 
 use core::mem;

@@ -1,7 +1,6 @@
 #![crate_name = "stage2"]
 #![crate_type = "staticlib"]
 #![feature(lang_items)]
-#![feature(no_std)]
 #![no_std]
 
 #[macro_use] extern crate sys;
@@ -15,9 +14,9 @@ mod std {
 }
 
 #[lang = "panic_fmt"] #[cold] #[inline(never)]
-extern fn rust_panic_fmt(_msg: std::fmt::Arguments, file: &'static str, line: usize) -> ! {
+extern fn rust_panic_fmt(_msg: std::fmt::Arguments, file: &'static str, line: u32) -> ! {
     // TODO: Replace this with a full argument-printing panic function.
-    sys::simple_panic(strref!(file), line as u32, strlit!("rust_panic_fmt"), strlit!(""))
+    sys::simple_panic(strref!(file), line, strlit!("rust_panic_fmt"), strlit!(""))
 }
 
 #[no_mangle]

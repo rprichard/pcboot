@@ -17,11 +17,9 @@ pub fn u32<'a>(mut val: u32, storage: &'a mut U32Storage) -> &'a str {
         }
     }
     unsafe {
-        let buf_slice = core::mem::transmute(
-            core::raw::Slice {
-                data: storage.as_ptr().offset(first as isize),
-                len: storage.len() - first,
-            }
+        let buf_slice = core::slice::from_raw_parts(
+            storage.as_ptr().offset(first as isize),
+            storage.len() - first,
         );
         core::str::from_utf8_unchecked(buf_slice)
     }

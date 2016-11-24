@@ -4,6 +4,6 @@
 # into here.
 build/librlibc.rlib : src/librlibc/lib.rs $(RUST_LIBCORE_DEP)
 	mkdir -p $(dir $@)
-	$(RUSTC) $(RUSTC_TARGET_FLAGS) $(RUST_LIBCORE_EXTERN) $< --out-dir $(dir $@) --emit link,dep-info --crate-type rlib --crate-name rlibc -C no-stack-check
+	$(RUSTC) $(RUSTC_TARGET_FLAGS) $(RUST_LIBCORE_EXTERN) $< --out-dir $(dir $@) --emit link,dep-info --crate-type rlib --crate-name rlibc
 
 -include build/rlibc.d

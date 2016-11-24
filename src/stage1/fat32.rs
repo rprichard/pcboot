@@ -319,12 +319,11 @@ fn find_file(
         // Is there a safe/better way to do this?
         let table: &[DirEntry] =
             unsafe {
-                core::mem::transmute(
-                    core::raw::Slice {
-                        data: read_buffer.as_ptr(),
-                        len: read_buffer.len() /
-                            core::mem::size_of::<DirEntry>(),
-                    })
+                core::slice::from_raw_parts(
+                    read_buffer.as_ptr() as *const DirEntry,
+                    read_buffer.len() /
+                        core::mem::size_of::<DirEntry>(),
+                )
             };
 
         for entry in table.iter() {

@@ -13,12 +13,12 @@ impl fmt::Write for SimpleWriter {
     }
 }
 
-#[lang = "panic_fmt"] #[cold] #[inline]
-extern fn rust_panic_fmt(msg: fmt::Arguments, file: &'static str, line: usize) -> ! {
+#[lang = "panic_fmt"] #[cold]
+extern fn rust_panic_fmt(msg: fmt::Arguments, file: &'static str, line: u32) -> ! {
     sys::print_str(&"internal error: ");
     sys::print_str(&file);
     sys::print_str(&":");
-    sys::print_u32(line as u32);
+    sys::print_u32(line);
     sys::print_str(&": ");
     let _ = fmt::write(&mut SimpleWriter, msg);
     sys::halt();

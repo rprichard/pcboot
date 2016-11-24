@@ -14,7 +14,7 @@ RUSTC_TARGET_FLAGS := \
     -L build \
     --cfg strref \
     --target i686-unknown-linux-gnu \
-    -C opt-level=2 \
+    -C opt-level=s \
     -C relocation-model=static \
     -C target-cpu=i386 \
     -C llvm-args=-rotation-max-header-size=0 \

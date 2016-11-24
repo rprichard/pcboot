@@ -1,6 +1,6 @@
 #![crate_name = "stage1"]
 #![crate_type = "staticlib"]
-#![feature(core, core_slice_ext, core_str_ext, lang_items, no_std, raw)]
+#![feature(lang_items)]
 #![no_std]
 
 #[macro_use] extern crate sys;
@@ -34,8 +34,9 @@ pub extern "C" fn pcboot_main(disk_number: u8, volume_lba: u32) -> ! {
 
     // Ideally, this check would be done at compile-time, but I do not know
     // whether that is possible.
-    let linker_size =
-        _stage2_end.get() as usize - _stage2.get() as usize;
+    let linker_size = unsafe {
+        _stage2_end.get() as usize - _stage2.get() as usize
+    };
     assert!(linker_size == STAGE2_SIZE);
 
     let disk = sys::open_disk(disk_number).unwrap();
